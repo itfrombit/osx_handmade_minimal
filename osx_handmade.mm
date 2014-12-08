@@ -91,7 +91,7 @@ DEBUGPlatformReadEntireFile(char* Filename)
 			{
 				ssize_t BytesRead;
 				BytesRead = read(fd, Result.Contents, FileSize32);
-				if (BytesRead == 0) // should have read until EOF
+				if (BytesRead == FileSize32) // should have read until EOF
 				{
 					Result.ContentsSize = FileSize32;
 				}
