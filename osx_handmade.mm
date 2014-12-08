@@ -673,13 +673,16 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
     [[self openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
     glGenTextures(1, &_textureId);
     glBindTexture(GL_TEXTURE_2D, _textureId);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, RenderBuffer.Width, RenderBuffer.Height, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, RenderBuffer.Memory);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, RenderBuffer.Width, RenderBuffer.Height,
+	             0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE /*GL_MODULATE*/);
 
 
     CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
@@ -714,28 +717,6 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 - (void) drawView
 {
-    [[self openGLContext] makeCurrentContext];
-
-	// NOTE(jeff): See above note about locking the context across threads
-    CGLLockContext([[self openGLContext] CGLContextObj]);
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    GLfloat vertices[] = {
-        -1, 1, 0,
-        -1, -1, 0,
-        1, -1, 0,
-        1, 1, 0
-    };
-    GLfloat tex_coords[] = {
-        0, 1,
-        0, 0,
-        1, 0,
-        1, 1,
-        //0, 1,
-    };
-
-
 	// TODO(jeff): Fix this for multiple controllers
 
 	local_persist game_input Input[2] = {};
@@ -769,7 +750,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	NewController->Left.EndedDown = _hidButtons[3];
 	NewController->Right.EndedDown = _hidButtons[4];
 
-	GameUpdateAndRender(&GameMemory, NewInput, &RenderBuffer, &SoundBuffer);
+	//GameUpdateAndRender(&GameMemory, NewInput, &RenderBuffer, &SoundBuffer);
 
 #if 1
 	static int redOffset = 0;
@@ -782,10 +763,10 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 		{
 			unsigned char* pixel = (uint8*)RenderBuffer.Memory + (y * RenderBuffer.Width + x) * 4;
 
-			pixel[0] = 0;	// a
-			pixel[1] = x + blueOffset;	// b
-			pixel[2] = y + greenOffset;	// g
-			pixel[3] = x + y + redOffset;	// r
+			pixel[0] = 0;                   // a
+			pixel[1] = x + blueOffset;      // b
+			pixel[2] = y + greenOffset;     // g
+			pixel[3] = x + y + redOffset;   // r
 		}
 	}
 
@@ -805,32 +786,49 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	NewInput = OldInput;
 	OldInput = Temp;
 
+	[[self openGLContext] makeCurrentContext];
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, RenderBuffer.Width, RenderBuffer.Height,
-                 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, RenderBuffer.Memory);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	// NOTE(jeff): See above note about locking the context across threads
+	CGLLockContext([[self openGLContext] CGLContextObj]);
 
-    //GetGLError();
-    glVertexPointer(3, GL_FLOAT, 0, vertices);
-    glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glBindTexture(GL_TEXTURE_2D, _textureId);
-    glEnable(GL_TEXTURE_2D);
-    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	GLfloat vertices[] = {
+        -1, 1, 0,
+        -1, -1, 0,
+        1, -1, 0,
+        1, 1, 0
+    };
+    GLfloat tex_coords[] = {
+        0, 1,
+        0, 0,
+        1, 0,
+        1, 1,
+        //0, 1,
+    };
 
-    GLushort indices[] = { 0, 1, 2, 0, 2, 3 };
-    glColor4f(1,1,1,1);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
-    glDisable(GL_TEXTURE_2D);
+	glVertexPointer(3, GL_FLOAT, 0, vertices);
+	glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
 
-    glDisableClientState(GL_VERTEX_ARRAY);
-    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
-    CGLFlushDrawable([[self openGLContext] CGLContextObj]);
-    CGLUnlockContext([[self openGLContext] CGLContextObj]);
+	glBindTexture(GL_TEXTURE_2D, _textureId);
+
+	glEnable(GL_TEXTURE_2D);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, RenderBuffer.Width, RenderBuffer.Height,
+	                GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, RenderBuffer.Memory);
+
+	GLushort indices[] = { 0, 1, 2, 0, 2, 3 };
+	glColor4f(1,1,1,1);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
+	glDisable(GL_TEXTURE_2D);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+
+	CGLFlushDrawable([[self openGLContext] CGLContextObj]);
+	CGLUnlockContext([[self openGLContext] CGLContextObj]);
 }
 
 - (void)viewWillDisappear
