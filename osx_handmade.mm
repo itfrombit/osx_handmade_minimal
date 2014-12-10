@@ -728,21 +728,15 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 {
     [super reshape];
 
-	// NOTE(jeff): Drawing is done on a background thread via CVDisplayLink.
-	// When the window/view is resized, reshape is called automatically on the
-	// main thread, so lock the context from simultaneous access during a resize.
-
-    CGLLockContext([[self openGLContext] CGLContextObj]);
-
-    CGLUnlockContext([[self openGLContext] CGLContextObj]);
-
     [self drawView:YES];
 }
 
 
 - (void)drawView:(BOOL)resize
 {
-	// NOTE(jeff): See above note about locking the context across threads
+	// NOTE(jeff): Drawing is normally done on a background thread via CVDisplayLink.
+	// When the window/view is resized, reshape is called automatically on the
+	// main thread, so lock the context from simultaneous access during a resize.
 	CGLLockContext([[self openGLContext] CGLContextObj]);
 
 	uint64 LastCycleCount = rdtsc();
