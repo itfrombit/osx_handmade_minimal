@@ -618,7 +618,7 @@ void OSXHIDAction(void* context, IOReturn result, void* sender, IOHIDValueRef va
 
     @autoreleasepool
     {
-        [self drawView];
+        [self drawView:NO];
     }
 
     return kCVReturnSuccess;
@@ -733,20 +733,29 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	// main thread, so lock the context from simultaneous access during a resize.
 
     CGLLockContext([[self openGLContext] CGLContextObj]);
-    NSRect rect = [self bounds];
-
-    glDisable(GL_DEPTH_TEST);
-    glLoadIdentity();
-    glViewport(0, 0, rect.size.width, rect.size.height);
 
     CGLUnlockContext([[self openGLContext] CGLContextObj]);
+
+    [self drawView:YES];
 }
 
 
-- (void) drawView
+- (void)drawView:(BOOL)resize
 {
+	// NOTE(jeff): See above note about locking the context across threads
+	CGLLockContext([[self openGLContext] CGLContextObj]);
+
 	uint64 LastCycleCount = rdtsc();
 	uint64 StartTime = mach_absolute_time();
+
+	if (resize)
+	{
+		NSRect rect = [self bounds];
+
+		glDisable(GL_DEPTH_TEST);
+		glLoadIdentity();
+		glViewport(0, 0, rect.size.width, rect.size.height);
+	}
 
 	// TODO(jeff): Fix this for multiple controllers
 
@@ -793,9 +802,6 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	OldInput = Temp;
 
 	[[self openGLContext] makeCurrentContext];
-
-	// NOTE(jeff): See above note about locking the context across threads
-	CGLLockContext([[self openGLContext] CGLContextObj]);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
