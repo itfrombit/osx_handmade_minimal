@@ -1071,6 +1071,7 @@ int main(int argc, const char* argv[])
 	// itself to our new view, but in Yosemite, you'll get a warning if you do that and 
 	// toggle to full screen mode.
 	[[window contentView] addSubview:view];
+	[window setMinSize:NSMakeSize(100, 100)];
 	[window setTitle:@"Handmade Hero"];
 	[window makeKeyAndOrderFront:nil];
 
