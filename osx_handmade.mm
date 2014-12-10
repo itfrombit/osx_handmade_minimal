@@ -443,8 +443,8 @@ void OSXHIDAction(void* context, IOReturn result, void* sender, IOHIDValueRef va
 			} break;
 
 			default:
-				NSLog(@"Gamepad Element: %@  Type: %d  Page: %d  Usage: %d  Name: %@  Cookie: %i  Value: %ld  _hidX: %d",
-					  element, type, usagePage, usage, name, cookie, elementValue, view->_hidX);
+				//NSLog(@"Gamepad Element: %@  Type: %d  Page: %d  Usage: %d  Name: %@  Cookie: %i  Value: %ld  _hidX: %d",
+				//      element, type, usagePage, usage, name, cookie, elementValue, view->_hidX);
 				break;
 		}
 	}
