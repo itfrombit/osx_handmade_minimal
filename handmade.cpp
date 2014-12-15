@@ -64,7 +64,7 @@ GameUpdateAndRender(game_memory *Memory, game_input *Input, game_offscreen_buffe
     game_state *GameState = (game_state *)Memory->PermanentStorage;
     if(!Memory->IsInitialized)
     {
-        char *Filename = __FILE__;
+        char *Filename = (char*)__FILE__;
         
         debug_read_file_result File = DEBUGPlatformReadEntireFile(Filename);
         if(File.Contents)

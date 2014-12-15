@@ -25,58 +25,22 @@
 #import <AudioUnit/AudioUnit.h>
 #import <IOKit/hid/IOHIDLib.h>
 
+#include <sys/stat.h>	// fstat()
 
-// TODO: Implement sine ourselves
-#import <math.h>
-
-
-// NOTE(jeff): These typedefs are the same as in win32
-#define internal static
-#define local_persist static
-#define global_variable static
-
-#define Pi32 3.14159265359f
-
-typedef int8_t int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-typedef int32 bool32;
-
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-typedef float real32;
-typedef double real64;
-
-
-#include "handmade.h"
-#include "handmade.cpp"
+#include <mach/mach_time.h>
 
 #include "osx_handmade.h"
 
 
-#include <sys/stat.h>	// fstat()
-#include <unistd.h>		// lseek()
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnull-dereference"
+#pragma clang diagnostic ignored "-Wc++11-compat-deprecated-writable-strings"
+#include "handmade.h"
+#include "handmade.cpp"
+#pragma clang diagnostic pop
 
-#include <mach/mach_time.h>
-
-
-global_variable bool32 GlobalRunning;
-global_variable osx_offscreen_buffer GlobalBackbuffer;
-global_variable osx_sound_output GlobalAudioBuffer;
-
-global_variable game_memory GameMemory = {};
-global_variable game_sound_output_buffer SoundBuffer = {};
-global_variable game_offscreen_buffer RenderBuffer = {};
-
-global_variable real64 MachTimebaseConversionFactor;
-
-// NOTE(jeff): I didn't worry about dynamic loading of the
-// various system libraries (like XInput and DirectSound on
-// win32). The chance of disaster isn't as bad on OS X.
+#include "osx_handmade.cpp"
+#include "HandmadeView.h"
 
 
 internal inline uint64
@@ -99,111 +63,6 @@ rdtsc()
 
 	return (((uint64)edx << 32) | eax);
 }
-
-
-internal debug_read_file_result
-DEBUGPlatformReadEntireFile(char* Filename)
-{
-	debug_read_file_result Result = {};
-
-	int fd = open(Filename, O_RDONLY);
-	if (fd != -1)
-	{
-		struct stat fileStat;
-		if (fstat(fd, &fileStat) == 0)
-		{
-			uint32 FileSize32 = fileStat.st_size;
-			Result.Contents = (char*)malloc(FileSize32);
-			if (Result.Contents)
-			{
-				ssize_t BytesRead;
-				BytesRead = read(fd, Result.Contents, FileSize32);
-				if (BytesRead == FileSize32) // should have read until EOF
-				{
-					Result.ContentsSize = FileSize32;
-				}
-				else
-				{
-					DEBUGPlatformFreeFileMemory(Result.Contents);
-					Result.Contents = 0;
-				}
-			}
-			else
-			{
-			}
-		}
-		else
-		{
-		}
-
-		close(fd);
-	}
-	else
-	{
-	}
-
-	return Result;
-}
-
-
-internal void
-DEBUGPlatformFreeFileMemory(void* Memory)
-{
-	if (Memory)
-	{
-		free(Memory);
-	}
-}
-
-
-internal bool32
-DEBUGPlatformWriteEntireFile(char* Filename, uint32 MemorySize, void* Memory)
-{
-	bool32 Result = false;
-
-	int fd = open(Filename, O_WRONLY | O_CREAT, 0644);
-	if (fd != -1)
-	{
-		ssize_t BytesWritten = write(fd, Memory, MemorySize);
-		Result = (BytesWritten == MemorySize);
-
-		if (!Result)
-		{
-			// TODO(jeff): Logging
-		}
-
-		close(fd);
-	}
-	else
-	{
-	}
-
-	return Result;
-}
-
-
-#define MAX_HID_BUTTONS 32
-
-@interface HandmadeView : NSOpenGLView
-{
-@public
-	// display
-	CVDisplayLinkRef	_displayLink;
-
-	// graphics
-	NSDictionary*		_fullScreenOptions;
-	GLuint				_textureId;
-	//unsigned int		_rows;
-	//unsigned int		_cols;
-	//unsigned char*	_renderbuffer;
-
-	// input
-	IOHIDManagerRef		_hidManager;
-	int					_hidX;
-	int					_hidY;
-	uint8				_hidButtons[MAX_HID_BUTTONS];
-}
-@end
 
 
 
@@ -551,11 +410,6 @@ void OSXHIDAction(void* context, IOReturn result, void* sender, IOHIDValueRef va
 }
 
 
-
-///////////////////////////////////////////////////////////////////////
-// View
-
-
 @implementation HandmadeView
 
 -(void)setupGamepad
@@ -618,7 +472,7 @@ void OSXHIDAction(void* context, IOReturn result, void* sender, IOHIDValueRef va
 
     @autoreleasepool
     {
-        [self drawView:NO];
+		[self drawView:NO];
     }
 
     return kCVReturnSuccess;
@@ -643,11 +497,37 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 }
 
 
-- (id)init
+- (void)setup
 {
-	self = [super init];
-	if (self == nil) return nil;
+	if (_setupComplete)
+	{
+		return;
+	}
 
+	// Allocate Memory
+	_gameMemory.PermanentStorageSize = Megabytes(64);
+	_gameMemory.TransientStorageSize = Gigabytes(4);
+	
+	uint64 totalSize = _gameMemory.PermanentStorageSize + _gameMemory.TransientStorageSize;
+	kern_return_t result = vm_allocate((vm_map_t)mach_task_self(),
+									   (vm_address_t*)&_gameMemory.PermanentStorage,
+									   totalSize,
+									   VM_FLAGS_ANYWHERE);
+	if (result != KERN_SUCCESS)
+	{
+		// TODO(jeff): Diagnostic
+		NSLog(@"Error allocating memory");
+	}
+	
+	_gameMemory.TransientStorage = ((uint8*)_gameMemory.PermanentStorage
+								   + _gameMemory.PermanentStorageSize);
+	
+	
+	// Get the conversion factor for doing profile timing with mach_absolute_time()
+	mach_timebase_info_data_t timebase;
+	mach_timebase_info(&timebase);
+	_machTimebaseConversionFactor = (double)timebase.numer / (double)timebase.denom;
+	
 	[self setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
 
     NSOpenGLPixelFormatAttribute attrs[] =
@@ -673,10 +553,10 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 													 forKey:NSFullScreenModeSetting];
 
 	int BytesPerPixel = 4;
-	RenderBuffer.Width = 800;
-	RenderBuffer.Height = 600;
-	RenderBuffer.Memory = (uint8*)malloc(RenderBuffer.Width * RenderBuffer.Height * 4);
-	RenderBuffer.Pitch = RenderBuffer.Width * BytesPerPixel;
+	_renderBuffer.Width = 800;
+	_renderBuffer.Height = 600;
+	_renderBuffer.Memory = (uint8*)malloc(_renderBuffer.Width * _renderBuffer.Height * 4);
+	_renderBuffer.Pitch = _renderBuffer.Width * BytesPerPixel;
 
 	//_cols = 800;
 	//_rows = 600;
@@ -686,7 +566,28 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 	OSXInitCoreAudio();
 
+	_setupComplete = YES;
+}
+
+
+- (id)init
+{
+	self = [super init];
+
+	if (self == nil)
+	{
+		return nil;
+	}
+
+	[self setup];
+
 	return self;
+}
+
+
+- (void)awakeFromNib
+{
+	[self setup];
 }
 
 
@@ -705,13 +606,12 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
     glGenTextures(1, &_textureId);
     glBindTexture(GL_TEXTURE_2D, _textureId);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, RenderBuffer.Width, RenderBuffer.Height,
-	             0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _renderBuffer.Width, _renderBuffer.Height,
+				 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE /*GL_MODULATE*/);
-
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE /*GL_MODULATE*/);
 
     CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
     CVDisplayLinkSetOutputCallback(_displayLink, &GLXViewDisplayLinkCallback, (__bridge void *)(self));
@@ -728,7 +628,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 {
     [super reshape];
 
-    [self drawView:YES];
+	[self drawView:YES];
 }
 
 
@@ -744,6 +644,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 	if (resize)
 	{
+		// In case we're called from reshape
 		NSRect rect = [self bounds];
 
 		glDisable(GL_DEPTH_TEST);
@@ -755,7 +656,6 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 		// NOTE(jeff): Don't run the game logic during resize events
 
 		// TODO(jeff): Fix this for multiple controllers
-
 		local_persist game_input Input[2] = {};
 		local_persist game_input* NewInput = &Input[0];
 		local_persist game_input* OldInput = &Input[1];
@@ -763,7 +663,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 		game_controller_input* OldController = &OldInput->Controllers[0];
 		game_controller_input* NewController = &NewInput->Controllers[0];
 
-#if 0
+	#if 0
 		OldController->IsAnalog = true;
 		OldController->StartX = OldController->EndX;
 		OldController->StartY = OldController->EndY;
@@ -774,7 +674,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 		OldController->Up.EndedDown = _hidButtons[2];
 		OldController->Left.EndedDown = _hidButtons[3];
 		OldController->Right.EndedDown = _hidButtons[4];
-#endif
+	#endif
 
 		NewController->IsAnalog = true;
 		NewController->StartX = OldController->EndX;
@@ -788,9 +688,9 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 		NewController->Right.EndedDown = _hidButtons[4];
 
 
-		GameUpdateAndRender(&GameMemory, NewInput, &RenderBuffer, &SoundBuffer);
+		GameUpdateAndRender(&_gameMemory, NewInput, &_renderBuffer, &_soundBuffer);
 
-
+		
 		// TODO(jeff): Move this into the game render code
 		GlobalFrequency = 440.0 + (32 * _hidY);
 
@@ -798,61 +698,66 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 		NewInput = OldInput;
 		OldInput = Temp;
 	}
-
+	
 	[[self openGLContext] makeCurrentContext];
-
+	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+	GLfloat vertices[] =
+	{
+		-1, 1, 0,
+		-1, -1, 0,
+		1, -1, 0,
+		1, 1, 0
+	};
 
-	GLfloat vertices[] = {
-        -1, 1, 0,
-        -1, -1, 0,
-        1, -1, 0,
-        1, 1, 0
-    };
-    GLfloat tex_coords[] = {
-        0, 1,
-        0, 0,
-        1, 0,
-        1, 1,
-        //0, 1,
-    };
+	GLfloat tex_coords[] =
+	{
+		0, 1,
+		0, 0,
+		1, 0,
+		1, 1,
+	};
 
-	glVertexPointer(3, GL_FLOAT, 0, vertices);
-	glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
+    glVertexPointer(3, GL_FLOAT, 0, vertices);
+    glTexCoordPointer(2, GL_FLOAT, 0, tex_coords);
 
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
-	glBindTexture(GL_TEXTURE_2D, _textureId);
+    glBindTexture(GL_TEXTURE_2D, _textureId);
 
-	glEnable(GL_TEXTURE_2D);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, RenderBuffer.Width, RenderBuffer.Height,
-	                GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, RenderBuffer.Memory);
+    glEnable(GL_TEXTURE_2D);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _renderBuffer.Width, _renderBuffer.Height,
+					GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, _renderBuffer.Memory);
+	
+    GLushort indices[] = { 0, 1, 2, 0, 2, 3 };
+    glColor4f(1,1,1,1);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
+    glDisable(GL_TEXTURE_2D);
 
-	GLushort indices[] = { 0, 1, 2, 0, 2, 3 };
-	glColor4f(1,1,1,1);
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
-	glDisable(GL_TEXTURE_2D);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+    CGLFlushDrawable([[self openGLContext] CGLContextObj]);
+    CGLUnlockContext([[self openGLContext] CGLContextObj]);
 
-	CGLFlushDrawable([[self openGLContext] CGLContextObj]);
-	CGLUnlockContext([[self openGLContext] CGLContextObj]);
-
+	
 	uint64 EndCycleCount = rdtsc();
 	uint64 EndTime = mach_absolute_time();
-
-	uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
-
-	real64 MSPerFrame = (real64)(EndTime - StartTime) * MachTimebaseConversionFactor / 1.0E6;
+	
+	//uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
+	
+	real64 MSPerFrame = (real64)(EndTime - StartTime) * _machTimebaseConversionFactor / 1.0E6;
 	real64 SPerFrame = MSPerFrame / 1000.0;
-	real64 FPS = 1.0 / SPerFrame;
-
-	//NSLog(@"%.02fms/f,  %.02ff/s", MSPerFrame, FPS);
+	//real64 FPS = 1.0 / SPerFrame;
+	
+	// NSLog(@"%.02fms/f,  %.02ff/s", MSPerFrame, FPS);
 }
 
-- (void)viewWillDisappear
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
+- (void)dealloc
 {
 	OSXStopCoreAudio();
 
@@ -863,8 +768,9 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
     CVDisplayLinkStop(_displayLink);
     CVDisplayLinkRelease(_displayLink);
 
-    [super dealloc];
+    //[super dealloc];
 }
+#pragma clang diagnostic pop
 
 
 - (void)toggleFullScreen:(id)sender
@@ -903,194 +809,4 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 @end
 
-
-///////////////////////////////////////////////////////////////////////
-// Application Delegate
-
-@interface HandmadeAppDelegate : NSObject<NSApplicationDelegate>
-@end
-
-
-@implementation HandmadeAppDelegate
-
-- (void)applicationDidFinishLaunching:(id)sender
-{
-	#pragma unused(sender)
-
-	// NOTE(jeff): Good place to do any additional initialization
-}
-
-- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)sender
-{
-	#pragma unused(sender)
-
-	// NOTE(jeff): Returning NO keeps the app running, but the window is
-	// still closed.
-	return YES;
-}
-
-- (void)applicationWillTerminate:(NSApplication*)sender
-{
-	// NOTE(jeff): Called just before the app exits.
-}
-
-
-@end
-
-
-
-@interface HandmadeApplication : NSApplication
-@end
-
-
-@implementation HandmadeApplication
-
-- (void)run
-{
-	[[NSApplication sharedApplication] finishLaunching];
-
-	[[NSNotificationCenter defaultCenter]
-		postNotificationName:NSApplicationWillFinishLaunchingNotification
-		object:NSApp];
-
-	[[NSNotificationCenter defaultCenter]
-		postNotificationName:NSApplicationDidFinishLaunchingNotification
-		object:NSApp];
-
-	while (GlobalRunning)
-	{
-		NSEvent* event;
-
-		do
-		{
-			event = [self nextEventMatchingMask:NSAnyEventMask
-									  untilDate:nil
-									  	 inMode:NSDefaultRunLoopMode
-										dequeue:YES];
-			[self sendEvent:event];
-			[self updateWindows];
-		} while (event != nil);
-	}
-}
-
-- (void)terminate:(id)sender
-{
-	GlobalRunning = false;
-}
-
-@end
-
-///////////////////////////////////////////////////////////////////////
-// Startup
-
-int main(int argc, const char* argv[])
-{
-	#pragma unused(argc)
-	#pragma unused(argv)
-
-	//return NSApplicationMain(argc, argv);
-	@autoreleasepool
-	{
-	NSApplication* app = [NSApplication sharedApplication];
-	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-
-
-	// Create the Menu. Two options right now:
-	//   Toggle Full Screen
-	//   Quit
-	NSMenu* menubar = [NSMenu new]; 
-
-	NSMenuItem* appMenuItem = [NSMenuItem new];
-	[menubar addItem:appMenuItem];
-
-	[NSApp setMainMenu:menubar];
-
-	NSMenu* appMenu = [NSMenu new];
-
-    //NSString* appName = [[NSProcessInfo processInfo] processName];
-    NSString* appName = @"Handmade Hero";
-
-
-    NSString* toggleFullScreenTitle = @"Toggle Full Screen";
-    NSMenuItem* toggleFullScreenMenuItem = [[NSMenuItem alloc] initWithTitle:toggleFullScreenTitle
-    											 action:@selector(toggleFullScreen:)
-    									  keyEquivalent:@"f"];
-    [appMenu addItem:toggleFullScreenMenuItem];
-
-    NSString* quitTitle = [@"Quit " stringByAppendingString:appName];
-    NSMenuItem* quitMenuItem = [[NSMenuItem alloc] initWithTitle:quitTitle
-    											 action:@selector(terminate:)
-    									  keyEquivalent:@"q"];
-    [appMenu addItem:quitMenuItem];
-    [appMenuItem setSubmenu:appMenu];
-
-
-	[app setDelegate:[[HandmadeAppDelegate alloc] init]];
-
-	// Allocate Memory
-	GameMemory.PermanentStorageSize = Megabytes(64);
-	GameMemory.TransientStorageSize = Gigabytes(4);
-
-	uint64 totalSize = GameMemory.PermanentStorageSize + GameMemory.TransientStorageSize;
-	kern_return_t result = vm_allocate((vm_map_t)mach_task_self(),
-	                                   (vm_address_t*)&GameMemory.PermanentStorage,
-	                                   totalSize,
-	                                   VM_FLAGS_ANYWHERE);
-	if (result != KERN_SUCCESS)
-	{
-		// TODO(jeff): Diagnostic
-		NSLog(@"Error allocating memory");
-	}
-
-	GameMemory.TransientStorage = ((uint8*)GameMemory.PermanentStorage
-		                                 + GameMemory.PermanentStorageSize);
-
-
-	mach_timebase_info_data_t timebase;
-	mach_timebase_info(&timebase);
-	MachTimebaseConversionFactor = (double)timebase.numer / (double)timebase.denom;
-
-
-	// Create the main window and the content view
-	NSRect screenRect = [[NSScreen mainScreen] frame];
-	NSRect frame = NSMakeRect((screenRect.size.width - 800.0f) * 0.5,
-	                          (screenRect.size.height - 600.0f) * 0.5,
-	                          800.0f,
-	                          600.0f);
-
-	NSWindow* window = [[NSWindow alloc] initWithContentRect:frame
-										 styleMask:NSTitledWindowMask
-											               | NSClosableWindowMask
-											               | NSMiniaturizableWindowMask
-											               | NSResizableWindowMask
-										   backing:NSBackingStoreBuffered
-										     defer:NO];
-
-	HandmadeView* view = [[HandmadeView alloc] init];
-	[view setFrame:[[window contentView] bounds]];
-	[view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-
-	// NOTE(jeff): Make our view a subview of the default content view that gets created
-	// with the window. You used to be able to be able to replace the default contentView
-	// itself to our new view, but in Yosemite, you'll get a warning if you do that and 
-	// toggle to full screen mode.
-	[[window contentView] addSubview:view];
-	[window setMinSize:NSMakeSize(100, 100)];
-	[window setTitle:@"Handmade Hero"];
-	[window makeKeyAndOrderFront:nil];
-
-
-
-
-	// NOTE(jeff): You can also explicitly create your own run loop here instead of
-	// calling [NSApp run], but at the moment, there's no real reason to.
-	//
-	// Don't call NSApplicationMain() here if you are doing everything programmatically
-	// as it expects an Info.plist file and a nib to load.
-
-	GlobalRunning = true;
-
-	[NSApp run];
-	}
-}
 

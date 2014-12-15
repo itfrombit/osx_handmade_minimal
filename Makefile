@@ -15,14 +15,11 @@ BINARIES = handmade
 
 default: handmade
 
-handmade: osx_handmade.o 
+handmade: osx_main.o
 	$(CXX) $(COPTS) $(OSXLDFLAGS) -o $@ $^
 
-osx_handmade.o: osx_handmade.mm
+osx_main.o: osx_main.mm osx_handmade.cpp osx_handmade.h handmade.h handmade.cpp HandmadeView.mm HandmadeView.h
 	$(CXX) $(COPTS) -c $<
-
-handmade.o: handmade.cpp
-	$(CXX) $(COPTS) $(CPP11FLAGS) -c $<
 
 minapp: minapp.o 
 	$(CXX) $(COPTS) $(OSXLDFLAGS) -o $@ $^
