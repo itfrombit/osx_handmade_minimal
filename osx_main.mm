@@ -13,15 +13,10 @@
 // TODO: Implement sine ourselves
 #import <math.h>
 
-/*
-#include "osx_handmade.h"
+#import "handmade.h"
+#import "osx_handmade.h"
+#import "HandmadeView.h"
 
-#include "handmade.h"
-#include "handmade.cpp"
-*/
-
-#import "HandmadeView.mm"
-@class HandmadeView;
 
 global_variable bool32 GlobalRunning;
 
@@ -53,13 +48,15 @@ global_variable bool32 GlobalRunning;
 
 - (void)applicationWillTerminate:(NSApplication*)sender
 {
+	#pragma unused(sender)
+
 	// NOTE(jeff): Called just before the app exits.
 }
 
 @end
 
 
-
+#if 0
 @interface HandmadeApplication : NSApplication
 @end
 
@@ -100,6 +97,7 @@ global_variable bool32 GlobalRunning;
 }
 
 @end
+#endif
 
 
 void OSXCreateMainMenu()
