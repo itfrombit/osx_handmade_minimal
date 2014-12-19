@@ -10,7 +10,9 @@ See the osx_handmade repository for the "standard" OS X version.
 
 
 
-*IMPORTANT*: I removed Casey's handmade.cpp/.h files from this repository.
+IMPORTANT
+---------
+I removed Casey's handmade.cpp/.h files from this repository.
 Once you clone or update from this repository, copy over the
 handmade.cpp/.h files from Casey's source code.
 
