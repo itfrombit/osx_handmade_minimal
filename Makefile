@@ -14,11 +14,11 @@ OSX_LD_FLAGS = -framework Cocoa -framework QuartzCore -framework OpenGL -framewo
 
 CLANG_ARC_FLAGS = -fobjc-arc
 
-BINARIES = handmade libhandmade.so
+BINARIES = handmade libhandmade.dylib
 
-default: libhandmade.so handmade
+default: libhandmade.dylib handmade
 
-#handmade: osx_main.o osx_handmade.o libhandmade.so HandmadeView.o
+#handmade: osx_main.o osx_handmade.o libhandmade.dylib HandmadeView.o
 #	$(CXX) $(COPTS) $(OSX_LD_FLAGS) -L. -lhandmade -o $@ $^
 
 handmade: osx_main.o osx_handmade.o HandmadeView.o
@@ -27,10 +27,10 @@ handmade: osx_main.o osx_handmade.o HandmadeView.o
 	mkdir -p Handmade.app/Contents/MacOS
 	mkdir -p Handmade.app/Contents/Resources
 	cp handmade Handmade.app/Contents/MacOS/Handmade
-	cp libhandmade.so Handmade.app/Contents/MacOS/libhandmade.so
+	cp libhandmade.dylib Handmade.app/Contents/MacOS/libhandmade.dylib
 
 
-libhandmade.so: handmade.o
+libhandmade.dylib: handmade.o
 	$(CXX) $(COPTS) -dynamiclib -o $@ $^
 
 HandmadeView.o: HandmadeView.mm HandmadeView.h

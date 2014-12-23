@@ -722,7 +722,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 	OSXGetAppFilename(&_osxState);
 
-	OSXBuildAppPathFilename(&_osxState, (char*)"libhandmade.so",
+	OSXBuildAppPathFilename(&_osxState, (char*)"libhandmade.dylib",
 	                        sizeof(_sourceGameCodeDLFullPath), _sourceGameCodeDLFullPath);
 
 	// NOTE(jeff): We don't have to create a temp file
