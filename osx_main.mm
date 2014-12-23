@@ -51,6 +51,7 @@ global_variable bool32 GlobalRunning;
 	#pragma unused(sender)
 
 	// NOTE(jeff): Called just before the app exits.
+	printf("applicationWillTerminate\n");
 }
 
 @end
@@ -178,8 +179,6 @@ int main(int argc, const char* argv[])
 	[window setMinSize:NSMakeSize(100, 100)];
 	[window setTitle:@"Handmade Hero"];
 	[window makeKeyAndOrderFront:nil];
-
-
 
 
 	// NOTE(jeff): You can also explicitly create your own run loop here instead of

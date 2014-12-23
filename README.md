@@ -6,7 +6,8 @@ A port of Handmade Hero (http://handmadehero.org) for OS X.
 This version is a demonstration of how to create the app without
 using Xcode or xib files. This is a work in progress.
 
-See the osx_handmade repository for the "standard" OS X version.
+See the osx_handmade repository for the "standard" OS X version
+that uses an Xcode project.
 
 
 
@@ -17,7 +18,7 @@ Once you clone or update from this repository, copy over the
 handmade.cpp/.h files from Casey's source code.
 
 This repository works with Casey's handmade.cpp/h files from
-handmade_hero_024_source.
+handmade_hero_025_source.
 
 
 

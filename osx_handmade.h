@@ -1,5 +1,6 @@
 #pragma once
 
+#include <AudioUnit/AudioUnit.h>
 #include <stdint.h>
 #include <math.h>
 
@@ -50,9 +51,13 @@ struct osx_sound_output
 	int SamplesPerSecond;
 	uint32 RunningSampleIndex;
 	int BytesPerSample;
+	uint32 BufferSize;
 	uint32 SafetyBytes;
-	real32 tSine;
-	int LatencySampleCount;
+	//real32 tSine;
+	AudioUnit AudioUnit;
+
+	Float64	Frequency;
+	double RenderPhase;
 };
 
 
@@ -71,10 +76,20 @@ struct osx_game_code
 //#define OSX_STATE_FILENAME_COUNT PROC_PIDPATHINFO_MAXSIZE
 #define OSX_STATE_FILENAME_COUNT FILENAME_MAX
 
+struct osx_replay_buffer
+{
+	int FileHandle;
+	int MemoryMap;
+	char Filename[OSX_STATE_FILENAME_COUNT];
+	void* MemoryBlock;
+};
+
+
 struct osx_state
 {
 	uint64 TotalSize;
 	void* GameMemoryBlock;
+	osx_replay_buffer ReplayBuffers[4];
 
 	int RecordingHandle;
 	int InputRecordingIndex;
@@ -125,11 +140,11 @@ DEBUG_PLATFORM_WRITE_ENTIRE_FILE(DEBUGPlatformWriteEntireFile);
 
 time_t OSXGetLastWriteTime(const char* Filename);
 
-osx_game_code OSXLoadGameCode(const char* SourceDLName, const char* TempDLName);
+osx_game_code OSXLoadGameCode(const char* SourceDLName);
 void OSXUnloadGameCode(osx_game_code* GameCode);
 
 
-void OSXGetInputFileLocation(osx_state* State, int SlotIndex, int DestCount, char* Dest);
+void OSXGetInputFileLocation(osx_state* State, bool32 InputStream, int SlotIndex, int DestCount, char* Dest);
 void OSXBeginRecordingInput(osx_state* State, int InputRecordingIndex);
 void OSXEndRecordingInput(osx_state* State);
 void OSXBeginInputPlayback(osx_state* State, int InputPlayingIndex);

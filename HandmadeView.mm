@@ -40,11 +40,6 @@
 //#pragma clang diagnostic pop
 
 
-global_variable AudioUnit	GlobalAudioUnit;
-global_variable double		GlobalAudioUnitRenderPhase;
-
-global_variable Float64		GlobalFrequency = 800.0;
-global_variable Float64		GlobalSampleRate = 48000.0;
 
 
 
@@ -84,14 +79,19 @@ global_variable Float64		GlobalSampleRate = 48000.0;
 	uint8						_hidButtons[MAX_HID_BUTTONS];
 
 	char _sourceGameCodeDLFullPath[OSX_STATE_FILENAME_COUNT];
-	char _tempGameCodeDLFullPath[OSX_STATE_FILENAME_COUNT];
 
 	game_memory					_gameMemory;
 	game_sound_output_buffer	_soundBuffer;
 	game_offscreen_buffer		_renderBuffer;
 
+	game_input					_input[2];
+	game_input*					_newInput;
+	game_input*					_oldInput;
+
 	osx_state					_osxState;
 	osx_game_code				_game;
+	osx_sound_output			_soundOutput;
+	thread_context				_thread;
 
 	real64						_machTimebaseConversionFactor;
 	BOOL						_setupComplete;
@@ -100,6 +100,7 @@ global_variable Float64		GlobalSampleRate = 48000.0;
 	NSMutableDictionary*		_elementDictionary;
 }
 @end
+
 
 OSStatus SineWaveRenderCallback(void * inRefCon,
                                 AudioUnitRenderActionFlags * ioActionFlags,
@@ -112,14 +113,17 @@ OSStatus SineWaveRenderCallback(void * inRefCon,
 	#pragma unused(inTimeStamp)
 	#pragma unused(inBusNumber)
 
-	double currentPhase = *((double*)inRefCon);
+	//double currentPhase = *((double*)inRefCon);
+
+	osx_sound_output* SoundOutput = ((osx_sound_output*)inRefCon);
+
 	Float32* outputBuffer = (Float32 *)ioData->mBuffers[0].mData;
-	const double phaseStep = (GlobalFrequency / GlobalSampleRate) * (2.0 * M_PI);
+	const double phaseStep = (SoundOutput->Frequency / SoundOutput->SamplesPerSecond) * (2.0 * M_PI);
 
 	for (UInt32 i = 0; i < inNumberFrames; i++)
 	{
-		outputBuffer[i] = 0.7 * sin(currentPhase);
-		currentPhase += phaseStep;
+		outputBuffer[i] = 0.7 * sin(SoundOutput->RenderPhase);
+		SoundOutput->RenderPhase += phaseStep;
 	}
 
 	// Copy to the stereo (or the additional X.1 channels)
@@ -128,13 +132,11 @@ OSStatus SineWaveRenderCallback(void * inRefCon,
 		memcpy(ioData->mBuffers[i].mData, outputBuffer, ioData->mBuffers[i].mDataByteSize);
 	}
 
-	*((double *)inRefCon) = currentPhase;
-
 	return noErr;
 }
 
 
-void OSXInitCoreAudio()
+void OSXInitCoreAudio(osx_sound_output* SoundOutput)
 {
 	AudioComponentDescription acd;
 	acd.componentType         = kAudioUnitType_Output;
@@ -143,12 +145,12 @@ void OSXInitCoreAudio()
 
 	AudioComponent outputComponent = AudioComponentFindNext(NULL, &acd);
 
-	AudioComponentInstanceNew(outputComponent, &GlobalAudioUnit);
-	AudioUnitInitialize(GlobalAudioUnit);
+	AudioComponentInstanceNew(outputComponent, &SoundOutput->AudioUnit);
+	AudioUnitInitialize(SoundOutput->AudioUnit);
 
 	// NOTE(jeff): Make this stereo
 	AudioStreamBasicDescription asbd;
-	asbd.mSampleRate       = GlobalSampleRate;
+	asbd.mSampleRate       = SoundOutput->SamplesPerSecond;
 	asbd.mFormatID         = kAudioFormatLinearPCM;
 	asbd.mFormatFlags      = kAudioFormatFlagsNativeFloatPacked;
 	asbd.mChannelsPerFrame = 1;
@@ -158,7 +160,7 @@ void OSXInitCoreAudio()
 	asbd.mBytesPerFrame    = 1 * sizeof(Float32);
 
 	// TODO(jeff): Add some error checking...
-	AudioUnitSetProperty(GlobalAudioUnit,
+	AudioUnitSetProperty(SoundOutput->AudioUnit,
                          kAudioUnitProperty_StreamFormat,
                          kAudioUnitScope_Input,
                          0,
@@ -167,25 +169,25 @@ void OSXInitCoreAudio()
 
 	AURenderCallbackStruct cb;
 	cb.inputProc       = SineWaveRenderCallback;
-	cb.inputProcRefCon = &GlobalAudioUnitRenderPhase;
+	cb.inputProcRefCon = SoundOutput;
 
-	AudioUnitSetProperty(GlobalAudioUnit,
+	AudioUnitSetProperty(SoundOutput->AudioUnit,
                          kAudioUnitProperty_SetRenderCallback,
                          kAudioUnitScope_Global,
                          0,
                          &cb,
                          sizeof(cb));
 
-	AudioOutputUnitStart(GlobalAudioUnit);
+	AudioOutputUnitStart(SoundOutput->AudioUnit);
 }
 
 
-void OSXStopCoreAudio()
+void OSXStopCoreAudio(osx_sound_output* SoundOutput)
 {
 	NSLog(@"Stopping Core Audio");
-	AudioOutputUnitStop(GlobalAudioUnit);
-	AudioUnitUninitialize(GlobalAudioUnit);
-	AudioComponentInstanceDispose(GlobalAudioUnit);
+	AudioOutputUnitStop(SoundOutput->AudioUnit);
+	AudioUnitUninitialize(SoundOutput->AudioUnit);
+	AudioComponentInstanceDispose(SoundOutput->AudioUnit);
 }
 
 
@@ -205,7 +207,8 @@ void OSXHIDAdded(void* context, IOReturn result, void* sender, IOHIDDeviceRef de
 
 	NSLog(@"Gamepad was detected: %@ %@", (__bridge NSString*)manufacturerCFSR, (__bridge NSString*)productCFSR);
 
-	NSArray *elements = (__bridge_transfer NSArray *)IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
+	//NSArray *elements = (__bridge_transfer NSArray *)IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
+	NSArray *elements = (__bridge NSArray *)IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
 
 	for (id element in elements)
 	{
@@ -513,17 +516,36 @@ void OSXHIDAction(void* context, IOReturn result, void* sender, IOHIDValueRef va
 				keyName = @"Right";
 				break;
 
-			case kHIDUsage_KeyboardL:
+			case kHIDUsage_KeyboardP:
+				keyName = @"p";
+
 				if (isDown)
 				{
-					if (view->_osxState.InputRecordingIndex == 0)
+					// TODO(jeff): Implement global pause
+					//GlobalPause = !GlobalPause;
+				}
+				break;
+
+			case kHIDUsage_KeyboardL:
+				keyName = @"l";
+
+				if (isDown)
+				{
+					if (view->_osxState.InputPlayingIndex == 0)
 					{
-						OSXBeginRecordingInput(&view->_osxState, 1);
+						if (view->_osxState.InputRecordingIndex == 0)
+						{
+							OSXBeginRecordingInput(&view->_osxState, 1);
+						}
+						else
+						{
+							OSXEndRecordingInput(&view->_osxState);
+							OSXBeginInputPlayback(&view->_osxState, 1);
+						}
 					}
 					else
 					{
-						OSXEndRecordingInput(&view->_osxState);
-						OSXBeginInputPlayback(&view->_osxState, 1);
+						OSXEndInputPlayback(&view->_osxState);
 					}
 				}
 				break;
@@ -653,7 +675,7 @@ void OSXHIDAction(void* context, IOReturn result, void* sender, IOHIDValueRef va
 
     @autoreleasepool
     {
-		[self processFrame:NO];
+		[self processFrameAndRunGameLogic:YES];
     }
 
     return kCVReturnSuccess;
@@ -685,6 +707,12 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 		return;
 	}
 
+	// Get the conversion factor for doing profile timing with mach_absolute_time()
+	mach_timebase_info_data_t timebase;
+	mach_timebase_info(&timebase);
+	_machTimebaseConversionFactor = (double)timebase.numer / (double)timebase.denom;
+
+
 	// TODO(jeff): Remove this
 	_elementDictionary = [[NSMutableDictionary alloc] init];
 
@@ -697,11 +725,8 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	OSXBuildAppPathFilename(&_osxState, (char*)"libhandmade.so",
 	                        sizeof(_sourceGameCodeDLFullPath), _sourceGameCodeDLFullPath);
 
-	OSXBuildAppPathFilename(&_osxState, (char*)"libhandmade_temp.so",
-	                        sizeof(_tempGameCodeDLFullPath), _tempGameCodeDLFullPath);
-
-	_game = OSXLoadGameCode(_sourceGameCodeDLFullPath,
-	                        _tempGameCodeDLFullPath);
+	// NOTE(jeff): We don't have to create a temp file
+	_game = OSXLoadGameCode(_sourceGameCodeDLFullPath);
 
 
 	///////////////////////////////////////////////////////////////////
@@ -714,24 +739,18 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 #endif
 
 	_gameMemory.PermanentStorageSize = Megabytes(64);
-	_gameMemory.TransientStorageSize = Gigabytes(1);
+	_gameMemory.TransientStorageSize = Megabytes(64); //Gigabytes(1);
 	_gameMemory.DEBUGPlatformFreeFileMemory = DEBUGPlatformFreeFileMemory;
 	_gameMemory.DEBUGPlatformReadEntireFile = DEBUGPlatformReadEntireFile;
 	_gameMemory.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
 
 	_osxState.TotalSize = _gameMemory.PermanentStorageSize + _gameMemory.TransientStorageSize;
 
-#ifdef HANDMADE_USE_VM_ALLOCATE
-	kern_return_t result = vm_allocate((vm_map_t)mach_task_self(),
-									   (vm_address_t*)&_osxState.GameMemoryBlock,
-									   _osxState.TotalSize,
-									   VM_FLAGS_ANYWHERE);
-	if (result != KERN_SUCCESS)
-	{
-		// TODO(jeff): Diagnostic
-		NSLog(@"Error allocating memory");
-	}
-#else
+
+#ifndef HANDMADE_USE_VM_ALLOCATE
+	// NOTE(jeff): I switched to mmap as the default, so unless the above
+	// HANDMADE_USE_VM_ALLOCATE is defined in the build/make process,
+	// we'll use the mmap version.
 
 	_osxState.GameMemoryBlock = mmap(RequestedAddress, _osxState.TotalSize,
 	                                 PROT_READ|PROT_WRITE,
@@ -741,6 +760,16 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	{
 		printf("mmap error: %d  %s", errno, strerror(errno));
 	}
+#else
+	kern_return_t result = vm_allocate((vm_map_t)mach_task_self(),
+									   (vm_address_t*)&_osxState.GameMemoryBlock,
+									   _osxState.TotalSize,
+									   VM_FLAGS_ANYWHERE);
+	if (result != KERN_SUCCESS)
+	{
+		// TODO(jeff): Diagnostic
+		NSLog(@"Error allocating memory");
+	}
 #endif
 
 	_gameMemory.PermanentStorage = _osxState.GameMemoryBlock;
@@ -748,11 +777,93 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 								   + _gameMemory.PermanentStorageSize);
 
 
-	// Get the conversion factor for doing profile timing with mach_absolute_time()
-	mach_timebase_info_data_t timebase;
-	mach_timebase_info(&timebase);
-	_machTimebaseConversionFactor = (double)timebase.numer / (double)timebase.denom;
-	
+	///////////////////////////////////////////////////////////////////
+	// Set up replay buffers
+
+	for (int ReplayIndex = 0;
+	     ReplayIndex < ArrayCount(_osxState.ReplayBuffers);
+	     ++ReplayIndex)
+	{
+		osx_replay_buffer* ReplayBuffer = &_osxState.ReplayBuffers[ReplayIndex];
+
+		OSXGetInputFileLocation(&_osxState, false, ReplayIndex,
+		                        sizeof(ReplayBuffer->Filename), ReplayBuffer->Filename);
+
+		ReplayBuffer->FileHandle = open(ReplayBuffer->Filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
+
+		if (ReplayBuffer->FileHandle != -1)
+		{
+			ReplayBuffer->MemoryBlock = mmap(0, _osxState.TotalSize,
+			                                 PROT_READ|PROT_WRITE,
+			                                 MAP_PRIVATE,
+			                                 ReplayBuffer->FileHandle,
+			                                 0);
+			if (ReplayBuffer->MemoryBlock != MAP_FAILED)
+			{
+#if 1
+				fstore_t fstore = {};
+				fstore.fst_flags = F_ALLOCATECONTIG;
+				fstore.fst_posmode = F_PEOFPOSMODE;
+				fstore.fst_offset = 0;
+				fstore.fst_length = _osxState.TotalSize;
+
+				int Result = fcntl(ReplayBuffer->FileHandle, F_PREALLOCATE, &fstore);
+				if (Result != -1)
+				{
+					Result = ftruncate(ReplayBuffer->FileHandle, _osxState.TotalSize);
+
+					if (Result != 0)
+					{
+						printf("ftruncate error on ReplayBuffer[%d]: %d: %s\n",
+						       ReplayIndex, errno, strerror(errno));
+					}
+				}
+				else
+				{
+					printf("fcntl error on ReplayBuffer[%d]: %d: %s\n",
+					       ReplayIndex, errno, strerror(errno));
+				}
+#else
+				// NOTE(jeff): Tried out Filip's lseek suggestion to see if
+				// it is any faster than ftruncate. Seems about the same.
+				off_t SeekOffset = lseek(ReplayBuffer->FileHandle, _osxState.TotalSize - 1, SEEK_SET);
+
+				if (SeekOffset)
+				{
+					int BytesWritten = write(ReplayBuffer->FileHandle, "", 1);
+
+					if (BytesWritten != 1)
+					{
+						printf("Error writing to lseek offset of ReplayBuffer[%d]: %d: %s\n",
+							   ReplayIndex, errno, strerror(errno));
+					}
+				}
+#endif
+			}
+			else
+			{
+				printf("mmap error on ReplayBuffer[%d]: %d  %s",
+				       ReplayIndex, errno, strerror(errno));
+			}
+		}
+		else
+		{
+			printf("Error creating ReplayBuffer[%d] file %s: %d : %s\n",
+					ReplayIndex, ReplayBuffer->Filename, errno, strerror(errno));
+		}
+	}
+
+
+	///////////////////////////////////////////////////////////////////
+	// Set up input
+
+	_newInput = &_input[0];
+	_oldInput = &_input[1];
+
+
+	///////////////////////////////////////////////////////////////////
+	// Set up view resizing and OpenGL
+
 	[self setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
 
     NSOpenGLPixelFormatAttribute attrs[] =
@@ -787,7 +898,13 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 	[self setupGamepad];
 
-	OSXInitCoreAudio();
+
+	_soundOutput.SamplesPerSecond = 48000;
+	_soundOutput.Frequency = 800.0;
+	_soundOutput.BytesPerSample = sizeof(int16) * 2;
+	_soundOutput.BufferSize = _soundOutput.SamplesPerSecond * _soundOutput.BytesPerSample;
+
+	OSXInitCoreAudio(&_soundOutput);
 
 	_setupComplete = YES;
 }
@@ -816,46 +933,46 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 - (void)prepareOpenGL
 {
-    [super prepareOpenGL];
+	[super prepareOpenGL];
 
-    [[self openGLContext] makeCurrentContext];
+	[[self openGLContext] makeCurrentContext];
 
-    // NOTE(jeff): Use the vertical refresh rate to sync buffer swaps
-    GLint swapInt = 1;
-    [[self openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
+	// NOTE(jeff): Use the vertical refresh rate to sync buffer swaps
+	GLint swapInt = 1;
+	[[self openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
 
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-    glGenTextures(1, &_textureId);
-    glBindTexture(GL_TEXTURE_2D, _textureId);
+	glGenTextures(1, &_textureId);
+	glBindTexture(GL_TEXTURE_2D, _textureId);
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _renderBuffer.Width, _renderBuffer.Height,
 				 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE /*GL_MODULATE*/);
 
-    CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
-    CVDisplayLinkSetOutputCallback(_displayLink, &GLXViewDisplayLinkCallback, (__bridge void *)(self));
+	CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
+	CVDisplayLinkSetOutputCallback(_displayLink, &GLXViewDisplayLinkCallback, (__bridge void *)(self));
 
-    CGLContextObj cglContext = [[self openGLContext] CGLContextObj];
-    CGLPixelFormatObj cglPixelFormat = [[self pixelFormat] CGLPixelFormatObj];
-    CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(_displayLink, cglContext, cglPixelFormat);
+	CGLContextObj cglContext = [[self openGLContext] CGLContextObj];
+	CGLPixelFormatObj cglPixelFormat = [[self pixelFormat] CGLPixelFormatObj];
+	CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(_displayLink, cglContext, cglPixelFormat);
 
-    CVDisplayLinkStart(_displayLink);
+	CVDisplayLinkStart(_displayLink);
 }
 
 
 - (void)reshape
 {
-    [super reshape];
+	[super reshape];
 
-	[self processFrame:YES];
+	[self processFrameAndRunGameLogic:NO];
 }
 
 
-- (void)processFrame:(BOOL)resize
+- (void)processFrameAndRunGameLogic:(BOOL)runGameLogicFlag
 {
 	// NOTE(jeff): Drawing is normally done on a background thread via CVDisplayLink.
 	// When the window/view is resized, reshape is called automatically on the
@@ -872,14 +989,13 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	if (NewDLWriteTime != _game.DLLastWriteTime)
 	{
 		OSXUnloadGameCode(&_game);
-		_game = OSXLoadGameCode(_sourceGameCodeDLFullPath,
-		                        _tempGameCodeDLFullPath);
+		_game = OSXLoadGameCode(_sourceGameCodeDLFullPath);
 	}
 
-	uint64 LastCycleCount = rdtsc();
-	uint64 StartTime = mach_absolute_time();
+	//uint64 LastCycleCount = rdtsc();
+	//uint64 StartTime = mach_absolute_time();
 
-	if (resize)
+	if (!runGameLogicFlag)
 	{
 		// NOTE(jeff): Don't run the game update logic during resize events
 		NSRect rect = [self bounds];
@@ -890,15 +1006,12 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	}
 	else
 	{
-		// NOTE(jeff): Not a resize, render the next frame
+		// NOTE(jeff): Not a resize, so run game logic and render the next frame
 
 		// TODO(jeff): Fix this for multiple controllers
-		local_persist game_input Input[2] = {};
-		local_persist game_input* NewInput = &Input[0];
-		local_persist game_input* OldInput = &Input[1];
 
-		game_controller_input* OldController = &OldInput->Controllers[0];
-		game_controller_input* NewController = &NewInput->Controllers[0];
+		//game_controller_input* OldController = &_oldInput->Controllers[0];
+		game_controller_input* NewController = &_newInput->Controllers[0];
 
 		NewController->IsAnalog = true;
 		NewController->StickAverageX = _hidX;
@@ -909,29 +1022,48 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 		NewController->ActionLeft.EndedDown = _hidButtons[3];
 		NewController->ActionRight.EndedDown = _hidButtons[4];
 
+		// NOTE(jeff): Use this instead of convertRectFromScreen: if you want to support Snow Leopard
+		// NSPoint PointInWindow = [[self window] convertScreenToBase:[NSEvent mouseLocation]];
+
+		NSPoint PointInScreen = [NSEvent mouseLocation];
+		NSRect RectInWindow = [[self window] convertRectFromScreen:NSMakeRect(PointInScreen.x, PointInScreen.y, 1, 1)];
+		NSPoint PointInWindow = RectInWindow.origin;
+		NSPoint PointInView = [self convertPoint:PointInWindow fromView:nil];
+
+		_newInput->MouseX = PointInView.x;
+		_newInput->MouseY = PointInView.y;
+		_newInput->MouseZ = 0; // TODO(casey): Support mousewheel?
+
+		NSUInteger ButtonMask = [NSEvent pressedMouseButtons];
+		_newInput->MouseButtons[0].EndedDown = ButtonMask & 0x0001;
+		_newInput->MouseButtons[1].EndedDown = (ButtonMask >> 1) & 0x0001;
+		_newInput->MouseButtons[2].EndedDown = (ButtonMask >> 2) & 0x0001;
+		_newInput->MouseButtons[3].EndedDown = (ButtonMask >> 3) & 0x0001;
+		_newInput->MouseButtons[4].EndedDown = (ButtonMask >> 4) & 0x0001;
+
 
 		if (_osxState.InputRecordingIndex)
 		{
-			OSXRecordInput(&_osxState, NewInput);
+			OSXRecordInput(&_osxState, _newInput);
 		}
 
 		if (_osxState.InputPlayingIndex)
 		{
-			OSXPlaybackInput(&_osxState, NewInput);
+			OSXPlaybackInput(&_osxState, _newInput);
 		}
 
 		if (_game.UpdateAndRender)
 		{
-			_game.UpdateAndRender(&_gameMemory, NewInput, &_renderBuffer);
+			_game.UpdateAndRender(&_thread, &_gameMemory, _newInput, &_renderBuffer);
 		}
 
 
 		// TODO(jeff): Move this into the sound render code
-		GlobalFrequency = 440.0 + (15 * _hidY);
+		_soundOutput.Frequency = 440.0 + (15 * _hidY);
 
-		game_input* Temp = NewInput;
-		NewInput = OldInput;
-		OldInput = Temp;
+		game_input* Temp = _newInput;
+		_newInput = _oldInput;
+		_oldInput = Temp;
 	}
 
 
@@ -939,9 +1071,9 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	// Draw the latest frame to the screen
 
 	[[self openGLContext] makeCurrentContext];
-	
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
+
 	GLfloat vertices[] =
 	{
 		-1, 1, 0,
@@ -969,7 +1101,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
     glEnable(GL_TEXTURE_2D);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _renderBuffer.Width, _renderBuffer.Height,
 					GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, _renderBuffer.Memory);
-	
+
     GLushort indices[] = { 0, 1, 2, 0, 2, 3 };
     glColor4f(1,1,1,1);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
@@ -981,17 +1113,17 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
     CGLFlushDrawable([[self openGLContext] CGLContextObj]);
     CGLUnlockContext([[self openGLContext] CGLContextObj]);
 
-	
+
 	///////////////////////////////////////////////////////////////////
 	// Update performance counters
 
-	uint64 EndCycleCount = rdtsc();
-	uint64 EndTime = mach_absolute_time();
+	//uint64 EndCycleCount = rdtsc();
+	//uint64 EndTime = mach_absolute_time();
 	
 	//uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
 	
-	real64 MSPerFrame = (real64)(EndTime - StartTime) * _machTimebaseConversionFactor / 1.0E6;
-	real64 SPerFrame = MSPerFrame / 1000.0;
+	//real64 MSPerFrame = (real64)(EndTime - StartTime) * _machTimebaseConversionFactor / 1.0E6;
+	//real64 SPerFrame = MSPerFrame / 1000.0;
 	//real64 FPS = 1.0 / SPerFrame;
 	
 	// NSLog(@"%.02fms/f,  %.02ff/s", MSPerFrame, FPS);
@@ -1001,7 +1133,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc
 {
-	OSXStopCoreAudio();
+	OSXStopCoreAudio(&_soundOutput);
 
 	// NOTE(jeff): It's a good idea to stop the display link before
 	// anything in the view is released. Otherwise, the display link

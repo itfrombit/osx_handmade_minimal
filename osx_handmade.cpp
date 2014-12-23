@@ -22,10 +22,11 @@
 #include <errno.h>
 #include <libproc.h>
 #include <dlfcn.h>
+#include <mach/mach_init.h>
+#include <mach/vm_map.h>
 
 #include "handmade.h"
 #include "osx_handmade.h"
-
 
 internal void
 CatStrings(size_t SourceACount, char *SourceA,
@@ -123,8 +124,16 @@ DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
 		if (fstat(fd, &fileStat) == 0)
 		{
 			uint32 FileSize32 = fileStat.st_size;
+
+#if 1
 			Result.Contents = (char*)malloc(FileSize32);
-			if (Result.Contents)
+#else	
+			kern_return_t result = vm_allocate((vm_map_t)mach_task_self(),
+									           (vm_address_t*)&Result.Contents,
+									           FileSize32,
+									           VM_FLAGS_ANYWHERE);
+
+			if ((result == KERN_SUCCESS) && Result.Contents)
 			{
 				ssize_t BytesRead;
 				BytesRead = read(fd, Result.Contents, FileSize32);
@@ -134,22 +143,29 @@ DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
 				}
 				else
 				{
-					DEBUGPlatformFreeFileMemory(Result.Contents);
+					DEBUGPlatformFreeFileMemory(Thread, Result.Contents);
 					Result.Contents = 0;
 				}
 			}
 			else
 			{
+				printf("DEBUGPlatformReadEntireFile %s:  vm_allocate error: %d: %s\n",
+				       Filename, errno, strerror(errno));
 			}
+#endif
 		}
 		else
 		{
+			printf("DEBUGPlatformReadEntireFile %s:  fstat error: %d: %s\n",
+			       Filename, errno, strerror(errno));
 		}
 
 		close(fd);
 	}
 	else
 	{
+		printf("DEBUGPlatformReadEntireFile %s:  open error: %d: %s\n",
+		       Filename, errno, strerror(errno));
 	}
 
 	return Result;
@@ -186,6 +202,13 @@ OSXGetLastWriteTime(const char* Filename)
 {
 	time_t LastWriteTime = 0;
 
+	struct stat FileStat;
+	if (stat(Filename, &FileStat) == 0)
+	{
+		LastWriteTime = FileStat.st_mtimespec.tv_sec;
+	}
+
+#if 0
 	int fd = open(Filename, O_RDONLY);
 	if (fd != -1)
 	{
@@ -197,13 +220,14 @@ OSXGetLastWriteTime(const char* Filename)
 
 		close(fd);
 	}
+#endif
 
 	return LastWriteTime;
 }
 
 
 osx_game_code
-OSXLoadGameCode(const char* SourceDLName, const char* TempDLName)
+OSXLoadGameCode(const char* SourceDLName)
 {
 	osx_game_code Result = {};
 
@@ -248,10 +272,21 @@ void OSXUnloadGameCode(osx_game_code* GameCode)
 }
 
 
-void OSXGetInputFileLocation(osx_state* State, int SlotIndex, int DestCount, char* Dest)
+void OSXGetInputFileLocation(osx_state* State, bool32 InputStream, int SlotIndex, int DestCount, char* Dest)
 {
-	Assert(SlotIndex == 1);
-	OSXBuildAppPathFilename(State, (char*)"loop_edit.hmi", DestCount, Dest);
+	char Temp[64];
+	sprintf(Temp, "loop_edit_%d_%s.hmi", SlotIndex, InputStream ? "input" : "state");
+	OSXBuildAppPathFilename(State, Temp, DestCount, Dest);
+}
+
+
+internal osx_replay_buffer*
+OSXGetReplayBuffer(osx_state* State, int unsigned Index)
+{
+	Assert(Index < ArrayCount(State->ReplayBuffers));
+	osx_replay_buffer* Result = &State->ReplayBuffers[Index];
+
+	return Result;
 }
 
 
@@ -259,33 +294,40 @@ void OSXBeginRecordingInput(osx_state* State, int InputRecordingIndex)
 {
 	printf("beginning recording input\n");
 
+	osx_replay_buffer* ReplayBuffer = OSXGetReplayBuffer(State, InputRecordingIndex);
+
 	if (State->InputPlayingIndex == 1)
 	{
 		printf("...first stopping input playback\n");
 		OSXEndInputPlayback(State);
 	}
 
-
-	State->InputRecordingIndex = InputRecordingIndex;
-
-	char Filename[OSX_STATE_FILENAME_COUNT];
-	OSXGetInputFileLocation(State, InputRecordingIndex, sizeof(Filename), Filename);
-
-	State->RecordingHandle = open(Filename, O_WRONLY | O_CREAT, 0644);
-
-	uint32 BytesToWrite = State->TotalSize;
-	Assert(State->TotalSize == BytesToWrite);
-
-	if (State->RecordingHandle != -1)
+	if (ReplayBuffer->MemoryBlock)
 	{
-		ssize_t BytesWritten = write(State->RecordingHandle, State->GameMemoryBlock, BytesToWrite);
-		bool Result = (BytesWritten == BytesToWrite);
+		State->InputRecordingIndex = InputRecordingIndex;
 
-		if (!Result)
+		char Filename[OSX_STATE_FILENAME_COUNT];
+		OSXGetInputFileLocation(State, true, InputRecordingIndex, sizeof(Filename), Filename);
+		State->RecordingHandle = open(Filename, O_WRONLY | O_CREAT, 0644);
+
+#if 0
+		uint32 BytesToWrite = State->TotalSize;
+		Assert(State->TotalSize == BytesToWrite);
+
+		if (State->RecordingHandle != -1)
 		{
-			// TODO(jeff): Logging
-			printf("write error recording input: %d: %s\n", errno, strerror(errno));
+			ssize_t BytesWritten = write(State->RecordingHandle, State->GameMemoryBlock, BytesToWrite);
+			bool Result = (BytesWritten == BytesToWrite);
+
+			if (!Result)
+			{
+				// TODO(jeff): Logging
+				printf("write error recording input: %d: %s\n", errno, strerror(errno));
+			}
 		}
+#endif
+
+		memcpy(ReplayBuffer->MemoryBlock, State->GameMemoryBlock, State->TotalSize);
 	}
 }
 
@@ -301,26 +343,34 @@ void OSXEndRecordingInput(osx_state* State)
 void OSXBeginInputPlayback(osx_state* State, int InputPlayingIndex)
 {
 	printf("beginning input playback\n");
-	State->InputPlayingIndex = InputPlayingIndex;
 
-	char Filename[OSX_STATE_FILENAME_COUNT];
-	OSXGetInputFileLocation(State, InputPlayingIndex, sizeof(Filename), Filename);
-
-	State->PlaybackHandle = open(Filename, O_RDONLY);
-
-	uint32 BytesToRead = State->TotalSize;
-	Assert(State->TotalSize == BytesToRead);
-
-	if (State->PlaybackHandle != -1)
+	osx_replay_buffer* ReplayBuffer = OSXGetReplayBuffer(State, InputPlayingIndex);
+	if (ReplayBuffer->MemoryBlock)
 	{
-		ssize_t BytesRead;
+		State->InputPlayingIndex = InputPlayingIndex;
 
-		BytesRead = read(State->PlaybackHandle, State->GameMemoryBlock, BytesToRead);
+		char Filename[OSX_STATE_FILENAME_COUNT];
+		OSXGetInputFileLocation(State, true, InputPlayingIndex, sizeof(Filename), Filename);
+		State->PlaybackHandle = open(Filename, O_RDONLY);
 
-		if (BytesRead != BytesToRead)
+#if 0
+		uint32 BytesToRead = State->TotalSize;
+		Assert(State->TotalSize == BytesToRead);
+
+		if (State->PlaybackHandle != -1)
 		{
-			printf("read error beginning input playback: %d: %s\n", errno, strerror(errno));
+			ssize_t BytesRead;
+
+			BytesRead = read(State->PlaybackHandle, State->GameMemoryBlock, BytesToRead);
+
+			if (BytesRead != BytesToRead)
+			{
+				printf("read error beginning input playback: %d: %s\n", errno, strerror(errno));
+			}
 		}
+#endif
+
+		memcpy(State->GameMemoryBlock, ReplayBuffer->MemoryBlock, State->TotalSize);
 	}
 }
 
