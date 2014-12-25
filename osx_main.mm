@@ -154,10 +154,10 @@ int main(int argc, const char* argv[])
 
 	// Create the main window and the content view
 	NSRect screenRect = [[NSScreen mainScreen] frame];
-	NSRect frame = NSMakeRect((screenRect.size.width - 800.0f) * 0.5,
-	                          (screenRect.size.height - 600.0f) * 0.5,
-	                          800.0f,
-	                          600.0f);
+	NSRect frame = NSMakeRect((screenRect.size.width - 960.0f) * 0.5,
+	                          (screenRect.size.height - 540.0f) * 0.5,
+	                          960.0f,
+	                          540.0f);
 
 	NSWindow* window = [[NSWindow alloc] initWithContentRect:frame
 										 styleMask:NSTitledWindowMask
