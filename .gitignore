@@ -3,6 +3,7 @@
 .ycm_extra_conf.pyc
 handmade
 handmade.dSYM/
+*.dylib
 *.so
 *.o
 test.out
