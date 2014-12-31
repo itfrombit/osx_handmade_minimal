@@ -13,13 +13,16 @@ that uses an Xcode project.
 
 IMPORTANT
 ---------
-I removed Casey's handmade.cpp/.h files from this repository.
+I removed Casey's game code source files from this repository.
+
 Once you clone or update from this repository, copy over the
-handmade.cpp/.h files from Casey's source code.
+following files from Casey's source code:
+  handmade_platform.h
+  handmade.h
+  handmade.cpp
 
 This repository works with Casey's handmade.cpp/h files from
-handmade_hero_025_source.
-
+handmade_hero_029_source.
 
 
 Author
