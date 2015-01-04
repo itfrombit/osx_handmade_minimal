@@ -8,3 +8,11 @@ handmade.dSYM/
 *.o
 test.out
 Handmade.app
+handmade.cpp
+handmade.h
+handmade_intrinsics.h
+handmade_platform.h
+handmade_random.h
+handmade_tile.cpp
+handmade_tile.h
+loop_edit*.hmi
