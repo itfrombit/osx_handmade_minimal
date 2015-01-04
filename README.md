@@ -24,25 +24,7 @@ following files from Casey's source code:
 - handmade_tile.cpp
 - handmade_tile.h
 
-
-**TEMPORARY IMPORTANT STEP:**
-After copying over the files, edit Day 035's handmade.h line 83 and change the return type of PushSize_() from
-
-```
-void *
-PushSize_(memory_arena *Arena, memory_index Size)
-```
-
-to
-
-```
-inline void *
-PushSize_(memory_arena *Arena, memory_index Size)
-```
-
-The addition of the inline keyword will prevent a duplicate symbol linker error when compiling the project.
-
-With the above change, this repository works with Casey's source code from handmade_hero_day_035_source.
+This repository works with Casey's source code from handmade_hero_day_035_source.
 
 
 Author

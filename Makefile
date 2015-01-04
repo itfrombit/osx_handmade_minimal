@@ -21,7 +21,7 @@ default: libhandmade.dylib handmade
 #handmade: osx_main.o osx_handmade.o libhandmade.dylib HandmadeView.o
 #	$(CXX) $(COPTS) $(OSX_LD_FLAGS) -L. -lhandmade -o $@ $^
 
-handmade: osx_main.o osx_handmade.o HandmadeView.o
+handmade: osx_main.o osx_handmade.o
 	$(CXX) $(COPTS) $(OSX_LD_FLAGS) -o $@ $^
 	rm -rf Handmade.app
 	mkdir -p Handmade.app/Contents/MacOS

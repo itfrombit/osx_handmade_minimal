@@ -17,6 +17,7 @@
 #import "osx_handmade.h"
 #import "HandmadeView.h"
 
+#import "HandmadeView.mm"
 
 global_variable bool32 GlobalRunning;
 
