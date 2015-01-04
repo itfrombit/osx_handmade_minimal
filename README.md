@@ -10,20 +10,39 @@ See the osx_handmade repository for the "standard" OS X version
 that uses an Xcode project.
 
 
-
 IMPORTANT
 ---------
 I removed Casey's platform-independent game code from this repository.
 
 Once you clone or update from this repository, copy over the
 following files from Casey's source code:
+- handmade.cpp
+- handmade.h
 - handmade_intrinsics.h
 - handmade_platform.h
-- handmade.h
-- handmade.cpp
+- handmade_random.h
+- handmade_tile.cpp
+- handmade_tile.h
 
-This repository works with Casey's source code from
-handmade_hero_day_029_source through (at least) handmade_hero_day_032_source.
+
+**TEMPORARY IMPORTANT STEP:**
+After copying over the files, edit Day 035's handmade.h line 83 and change the return type of PushSize_() from
+
+```
+void *
+PushSize_(memory_arena *Arena, memory_index Size)
+```
+
+to
+
+```
+inline void *
+PushSize_(memory_arena *Arena, memory_index Size)
+```
+
+The addition of the inline keyword will prevent a duplicate symbol linker error when compiling the project.
+
+With the above change, this repository works with Casey's source code from handmade_hero_day_035_source.
 
 
 Author
