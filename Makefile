@@ -24,9 +24,13 @@ default: libhandmade.dylib handmade
 handmade: osx_main.o osx_handmade.o
 	$(CXX) $(COPTS) $(OSX_LD_FLAGS) -o $@ $^
 	rm -rf Handmade.app
+	rm -rf ./Contents/Resources
 	mkdir -p Handmade.app/Contents/MacOS
 	mkdir -p Handmade.app/Contents/Resources
 	cp handmade Handmade.app/Contents/MacOS/Handmade
+	cp -R test Handmade.app/Contents/Resources/test
+	mkdir -p Contents/Resources
+	cp -R test ./Contents/Resources/test
 	cp libhandmade.dylib Handmade.app/Contents/MacOS/libhandmade.dylib
 
 

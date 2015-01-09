@@ -13,13 +13,14 @@
 // TODO: Implement sine ourselves
 #import <math.h>
 
+#import "handmade_platform.h"
 #import "handmade.h"
 #import "osx_handmade.h"
 #import "HandmadeView.h"
 
 #import "HandmadeView.mm"
 
-global_variable bool32 GlobalRunning;
+static bool32 GlobalRunning;
 
 
 ///////////////////////////////////////////////////////////////////////
@@ -147,6 +148,9 @@ int main(int argc, const char* argv[])
 	{
 	NSApplication* app = [NSApplication sharedApplication];
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+	NSString *dir = [[NSFileManager defaultManager] currentDirectoryPath];
+	NSLog(@"working directory: %@", dir);
 
 	OSXCreateMainMenu();
 
