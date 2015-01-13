@@ -1,5 +1,5 @@
 CXX			= clang
-HANDMADE_FLAGS = -Dsize_t=__darwin_size_t -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -DHANDMADE_MIN_OSX -Wno-null-dereference
+HANDMADE_FLAGS = -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -DHANDMADE_MIN_OSX -Wno-null-dereference
 
 COPTS		= -g -Wall $(HANDMADE_FLAGS)
 
@@ -21,7 +21,7 @@ default: libhandmade.dylib handmade
 #handmade: osx_main.o osx_handmade.o libhandmade.dylib HandmadeView.o
 #	$(CXX) $(COPTS) $(OSX_LD_FLAGS) -L. -lhandmade -o $@ $^
 
-handmade: osx_main.o osx_handmade.o
+handmade: osx_main.o osx_handmade.o HandmadeView.o
 	$(CXX) $(COPTS) $(OSX_LD_FLAGS) -o $@ $^
 	rm -rf Handmade.app
 	rm -rf ./Contents/Resources

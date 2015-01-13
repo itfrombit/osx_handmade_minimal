@@ -14,11 +14,8 @@
 #import <math.h>
 
 #import "handmade_platform.h"
-#import "handmade.h"
 #import "osx_handmade.h"
 #import "HandmadeView.h"
-
-#import "HandmadeView.mm"
 
 static bool32 GlobalRunning;
 
