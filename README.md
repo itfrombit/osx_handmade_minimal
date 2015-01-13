@@ -27,7 +27,7 @@ following files from Casey's source code:
 Also, copy over the test bitmap image asset folder to the
 root directory of this repository.
 
-This repository works with Casey's source code from handmade_hero_day_038_source.
+This repository works with Casey's source code from handmade_hero_day_040_source.
 
 
 Author
