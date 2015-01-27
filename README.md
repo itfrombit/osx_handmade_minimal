@@ -12,13 +12,13 @@ that uses an Xcode project.
 
 IMPORTANT
 ---------
-I removed Casey's platform-independent game code from this repository.
 
 Once you clone or update from this repository, copy over the
 following files from Casey's source code:
 - handmade.cpp
 - handmade.h
 - handmade_intrinsics.h
+- handmade_math.h
 - handmade_platform.h
 - handmade_random.h
 - handmade_tile.cpp
@@ -27,7 +27,7 @@ following files from Casey's source code:
 Also, copy over the test bitmap image asset folder to the
 root directory of this repository.
 
-This repository works with Casey's source code from handmade_hero_day_040_source.
+This repository works with Casey's source code from handmade_hero_day_051_source.
 
 
 Author
