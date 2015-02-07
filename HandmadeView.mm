@@ -1271,6 +1271,11 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	//uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
 	
 	//real64 MSPerFrame = (real64)(EndTime - StartTime) * _machTimebaseConversionFactor / 1.0E6;
+
+	//static int j = 0;
+	//NSString* msPerFrame = [NSString stringWithFormat:@"%8.5f - %d", MSPerFrame, j++];
+	//NSLog(msPerFrame);
+
 	//real64 SPerFrame = MSPerFrame / 1000.0;
 	//real64 FPS = 1.0 / SPerFrame;
 	

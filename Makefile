@@ -29,8 +29,10 @@ handmade: osx_main.o osx_handmade.o HandmadeView.o
 	mkdir -p Handmade.app/Contents/Resources
 	cp handmade Handmade.app/Contents/MacOS/Handmade
 	cp -R test Handmade.app/Contents/Resources/test
+	cp -R test2 Handmade.app/Contents/Resources/test2
 	mkdir -p Contents/Resources
 	cp -R test ./Contents/Resources/test
+	cp -R test2 ./Contents/Resources/test2
 	cp libhandmade.dylib Handmade.app/Contents/MacOS/libhandmade.dylib
 
 

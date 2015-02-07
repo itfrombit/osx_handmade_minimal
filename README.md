@@ -21,13 +21,20 @@ following files from Casey's source code:
 - handmade_math.h
 - handmade_platform.h
 - handmade_random.h
-- handmade_tile.cpp
-- handmade_tile.h
+- handmade_world.cpp
+- handmade_world.h
 
-Also, copy over the test bitmap image asset folder to the
+Also, copy over the test and test2 bitmap image asset folders to the
 root directory of this repository.
 
-This repository works with Casey's source code from handmade_hero_day_051_source.
+Once you copy over all of Casey's source code, type 'make' at the command
+line to build the executable and the application bundle. You can then 
+either run 'handmade' directly, or 'open Handmade.app'.
+
+Hot-loading is supported, so you can just run 'make' again while the 
+application is running to build and reload the newest code.
+
+This repository works with Casey's source code from handmade_hero_day_060_source.
 
 
 Author
