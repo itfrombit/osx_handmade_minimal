@@ -17,10 +17,14 @@ Once you clone or update from this repository, copy over the
 following files from Casey's source code:
 - handmade.cpp
 - handmade.h
+- handmade_entity.cpp
+- handmade.entity.h
 - handmade_intrinsics.h
 - handmade_math.h
 - handmade_platform.h
 - handmade_random.h
+- handmade_sim_region.cpp
+- handmade_sim_region.h
 - handmade_world.cpp
 - handmade_world.h
 
@@ -34,7 +38,7 @@ either run 'handmade' directly, or 'open Handmade.app'.
 Hot-loading is supported, so you can just run 'make' again while the 
 application is running to build and reload the newest code.
 
-This repository works with Casey's source code from handmade_hero_day_060_source.
+This repository works with Casey's source code from handmade_hero_day_072_source.
 
 
 Author
