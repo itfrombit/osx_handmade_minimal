@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 clang -g -Wall -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -Wno-null-dereference -Wno-c++11-compat-deprecated-writable-strings -c handmade.cpp
 clang -g -Wall -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -Wno-null-dereference -dynamiclib -o libhandmade.dylib handmade.o
 clang -g -Wall -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -Wno-null-dereference -c osx_main.mm
