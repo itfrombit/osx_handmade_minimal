@@ -1039,8 +1039,9 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
 	CVDisplayLinkSetOutputCallback(_displayLink, &GLXViewDisplayLinkCallback, (__bridge void *)(self));
 
-	CGLContextObj cglContext = [[self openGLContext] CGLContextObj];
-	CGLPixelFormatObj cglPixelFormat = [[self pixelFormat] CGLPixelFormatObj];
+	CGLContextObj cglContext = static_cast<CGLContextObj>( [[self openGLContext] CGLContextObj]);
+
+	CGLPixelFormatObj cglPixelFormat = static_cast<CGLPixelFormatObj>( [[self pixelFormat] CGLPixelFormatObj]);
 	CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(_displayLink, cglContext, cglPixelFormat);
 	
 	CVTime cvtime = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(_displayLink);
@@ -1066,7 +1067,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	// main thread, so lock the context from simultaneous access during a resize.
 
 	// TODO(jeff): Tighten up this GLContext lock
-	CGLLockContext([[self openGLContext] CGLContextObj]);
+	CGLLockContext(static_cast<CGLContextObj>([[self openGLContext] CGLContextObj]));
 
 
 	//uint64 LastCycleCount = rdtsc();
@@ -1260,8 +1261,8 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
     glDisableClientState(GL_VERTEX_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
-    CGLFlushDrawable([[self openGLContext] CGLContextObj]);
-    CGLUnlockContext([[self openGLContext] CGLContextObj]);
+    CGLFlushDrawable(static_cast<CGLContextObj>([[self openGLContext] CGLContextObj]));
+    CGLUnlockContext(static_cast<CGLContextObj>([[self openGLContext] CGLContextObj]));
 
 
 	///////////////////////////////////////////////////////////////////
