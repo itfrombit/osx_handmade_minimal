@@ -809,8 +809,10 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 #if HANDMADE_INTERNAL
 	char* RequestedAddress = (char*)Gigabytes(8);
+	uint32 AllocationFlags = MAP_PRIVATE|MAP_ANON|MAP_FIXED;
 #else
 	char* RequestedAddress = (char*)0;
+	uint32 AllocationFlags = MAP_PRIVATE|MAP_ANON;
 #endif
 
 	_gameMemory.PermanentStorageSize = Megabytes(64);
@@ -829,7 +831,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 	_osxState.GameMemoryBlock = mmap(RequestedAddress, _osxState.TotalSize,
 	                                 PROT_READ|PROT_WRITE,
-	                                 MAP_PRIVATE|MAP_FIXED|MAP_ANON,
+	                                 AllocationFlags,
 	                                 -1, 0);
 	if (_osxState.GameMemoryBlock == MAP_FAILED)
 	{
