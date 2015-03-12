@@ -1,6 +1,9 @@
 CXX			= clang
 HANDMADE_FLAGS = -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -DHANDMADE_MIN_OSX -Wno-null-dereference
 
+# Use the following to force compiling with 10.7 SDK testing:
+#HANDMADE_FLAGS = -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -DHANDMADE_MIN_OSX -Wno-null-dereference -isysroot /Applications/Xcode-Beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk
+
 COPTS		= -g -Wall $(HANDMADE_FLAGS)
 
 COPTS		= -O3 -Wall $(HANDMADE_FLAGS)
@@ -11,6 +14,7 @@ CPP11_LD_FLAGS = -lstdc++
 
 OSX_FLAGS = 
 OSX_LD_FLAGS = -framework Cocoa -framework QuartzCore -framework OpenGL -framework IOKit -framework AudioUnit
+#OSX_LD_FLAGS = -framework Cocoa -framework QuartzCore -framework OpenGL -framework IOKit -framework AudioUnit -Wl,-syslibroot /Applications/Xcode-Beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk
 
 CLANG_ARC_FLAGS = -fobjc-arc
 

@@ -105,6 +105,8 @@
 
 	// TODO(jeff): Replace with set of simple hash tables of structs
 	NSMutableDictionary*		_elementDictionary;
+
+	BOOL						_glFallbackMode;
 }
 @end
 
@@ -254,6 +256,7 @@ void OSXHIDAdded(void* context, IOReturn result, void* sender, IOHIDDeviceRef de
 
 		IOHIDElementType tIOHIDElementType = IOHIDElementGetType(tIOHIDElementRef);
 
+#if 0
 		switch(tIOHIDElementType)
 		{
 			case kIOHIDElementTypeInput_Misc:
@@ -282,6 +285,8 @@ void OSXHIDAdded(void* context, IOReturn result, void* sender, IOHIDDeviceRef de
 			default:
 				continue;
 		}
+#endif
+
 
 		uint32_t reportSize = IOHIDElementGetReportSize(tIOHIDElementRef);
 		uint32_t reportCount = IOHIDElementGetReportCount(tIOHIDElementRef);
@@ -304,7 +309,7 @@ void OSXHIDAdded(void* context, IOReturn result, void* sender, IOHIDDeviceRef de
 		CFIndex logicalMin = IOHIDElementGetLogicalMin(tIOHIDElementRef);
 		CFIndex logicalMax = IOHIDElementGetLogicalMax(tIOHIDElementRef);
 
-		printf("page/usage = %d:%d  min/max = (%ld, %ld)\n", usagePage, usage, logicalMin, logicalMax);
+		//printf("page/usage = %d:%d  min/max = (%ld, %ld)\n", usagePage, usage, logicalMin, logicalMax);
 
 		// TODO(jeff): Change NSDictionary to a simple hash table.
 		// TODO(jeff): Add a hash table for each controller. Use cookies for ID.
@@ -762,10 +767,71 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	#pragma unused(inFlags)
 	#pragma unused(outFlags)
 
-    CVReturn result = [(__bridge HandmadeView*)displayLinkContext getFrameForTime:outputTime];
+	HandmadeView* view = (__bridge HandmadeView*)displayLinkContext;
+
+    CVReturn result = [view getFrameForTime:outputTime];
+    
+	if (view->_glFallbackMode)
+	{
+		glFlush();
+	}
+
     return result;
 }
 
+
+#if HANDMADE_INTERNAL
+#define logOpenGLErrors(l) internalLogOpenGLErrors(l)
+#else
+#define logOpenGLErrors(l) {} 
+#endif
+
+static void internalLogOpenGLErrors(const char* label)
+{
+	GLenum err = glGetError();
+	const char* errString = "No error";
+
+	while (err != GL_NO_ERROR)
+	{
+		switch(err)
+		{
+			case GL_INVALID_ENUM:
+				errString = "Invalid Enum";
+				break;
+
+			case GL_INVALID_VALUE:
+				errString = "Invalid Value";
+				break;
+
+			case GL_INVALID_OPERATION:
+				errString = "Invalid Operation";
+				break;
+
+			case GL_INVALID_FRAMEBUFFER_OPERATION:
+				errString = "Invalid Framebuffer Operation";
+				break;
+
+			case GL_OUT_OF_MEMORY:
+				errString = "Out of Memory";
+				break;
+
+			case GL_STACK_UNDERFLOW:
+				errString = "Stack Underflow";
+				break;
+
+			case GL_STACK_OVERFLOW:
+				errString = "Stack Overflow";
+				break;
+
+			default:
+				errString = "Unknown Error";
+				break;
+		}
+		printf("glError on %s: %s\n", label, errString);
+
+		err = glGetError();
+	}
+}
 
 - (void)setup
 {
@@ -946,19 +1012,45 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
     NSOpenGLPixelFormatAttribute attrs[] =
     {
         NSOpenGLPFAAccelerated,
-        NSOpenGLPFANoRecovery,
         NSOpenGLPFADoubleBuffer,
+        NSOpenGLPFADepthSize, 24,
         //NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
         0
     };
+
+    NSOpenGLPixelFormatAttribute fallbackAttrs[] =
+    {
+        NSOpenGLPFADepthSize, 24,
+        //NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
+        0
+    };
+
+	_glFallbackMode = NO;
     NSOpenGLPixelFormat* pf = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
 
     if (pf == nil)
     {
-        NSLog(@"No OpenGL pixel format");
+        printf("Error creating OpenGLPixelFormat with accelerated attributes...trying fallback attributes\n");
+
+		pf = [[NSOpenGLPixelFormat alloc] initWithAttributes:fallbackAttrs];
+
+		if (pf == nil)
+		{
+			printf("Error creating OpenGLPixelFormat with fallback attributes\n");
+		}
+		else
+		{
+			_glFallbackMode = YES;
+		}
     }
 
+
     NSOpenGLContext* context = [[NSOpenGLContext alloc] initWithFormat:pf shareContext:nil];
+    if (context == nil)
+	{
+		printf("Error creating NSOpenGLContext\n");
+	}
+
     [self setPixelFormat:pf];
     [self setOpenGLContext:context];
 
@@ -1016,6 +1108,8 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 
 - (void)prepareOpenGL
 {
+	glGetError();
+
 	[super prepareOpenGL];
 
 	[[self openGLContext] makeCurrentContext];
@@ -1025,29 +1119,55 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	[[self openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	logOpenGLErrors("glPixelStorei");
 
 	glGenTextures(1, &_textureId);
+	logOpenGLErrors("glGenTextures");
+
 	glBindTexture(GL_TEXTURE_2D, _textureId);
+	logOpenGLErrors("glBindTexture");
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _renderBuffer.Width, _renderBuffer.Height,
 				 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
+	logOpenGLErrors("glTexImage2D");
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	logOpenGLErrors("glTexParameteri");
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	logOpenGLErrors("glTexParameteri");
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE /*GL_MODULATE*/);
+	logOpenGLErrors("glTexEnvi");
 
-	CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
-	CVDisplayLinkSetOutputCallback(_displayLink, &GLXViewDisplayLinkCallback, (__bridge void *)(self));
+	CVReturn cvreturn = CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
+	if (cvreturn != kCVReturnSuccess)
+	{
+		printf("Error in CVDisplayLinkCreateWithActiveCGDisplays(): %d\n", cvreturn);
+	}
 
-	CGLContextObj cglContext = [[self openGLContext] CGLContextObj];
-	CGLPixelFormatObj cglPixelFormat = [[self pixelFormat] CGLPixelFormatObj];
-	CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(_displayLink, cglContext, cglPixelFormat);
+	cvreturn = CVDisplayLinkSetOutputCallback(_displayLink, &GLXViewDisplayLinkCallback, (__bridge void *)(self));
+	if (cvreturn != kCVReturnSuccess)
+	{
+		printf("Error in CVDisplayLinkSetOutputCallback(): %d\n", cvreturn);
+	}
+
+	CGLContextObj cglContext = static_cast<CGLContextObj>([[self openGLContext] CGLContextObj]);
+	CGLPixelFormatObj cglPixelFormat = static_cast<CGLPixelFormatObj>([[self pixelFormat] CGLPixelFormatObj]);
+	cvreturn = CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(_displayLink, cglContext, cglPixelFormat);
+	if (cvreturn != kCVReturnSuccess)
+	{
+		printf("Error in CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(): %d\n", cvreturn);
+	}
 	
 	CVTime cvtime = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(_displayLink);
 	_targetSecondsPerFrame = (double)cvtime.timeValue / (double)cvtime.timeScale;
 
 	printf("targetSecondsPerFrame: %f\n", _targetSecondsPerFrame);
-	CVDisplayLinkStart(_displayLink);
+
+	cvreturn = CVDisplayLinkStart(_displayLink);
+	if (cvreturn != kCVReturnSuccess)
+	{
+		printf("Error in CVDisplayLinkStart(): %d\n", cvreturn);
+	}
 }
 
 
@@ -1066,7 +1186,7 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
 	// main thread, so lock the context from simultaneous access during a resize.
 
 	// TODO(jeff): Tighten up this GLContext lock
-	CGLLockContext([[self openGLContext] CGLContextObj]);
+	CGLLockContext(static_cast<CGLContextObj>([[self openGLContext] CGLContextObj]));
 
 
 	//uint64 LastCycleCount = rdtsc();
@@ -1260,8 +1380,8 @@ static CVReturn GLXViewDisplayLinkCallback(CVDisplayLinkRef displayLink,
     glDisableClientState(GL_VERTEX_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
-    CGLFlushDrawable([[self openGLContext] CGLContextObj]);
-    CGLUnlockContext([[self openGLContext] CGLContextObj]);
+    CGLFlushDrawable(static_cast<CGLContextObj>([[self openGLContext] CGLContextObj]));
+    CGLUnlockContext(static_cast<CGLContextObj>([[self openGLContext] CGLContextObj]));
 
 
 	///////////////////////////////////////////////////////////////////
