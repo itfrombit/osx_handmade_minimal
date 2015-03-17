@@ -107,6 +107,8 @@
 	NSMutableDictionary*		_elementDictionary;
 
 	BOOL						_glFallbackMode;
+
+	BOOL						_renderAtHalfSpeed;
 }
 @end
 
@@ -739,16 +741,28 @@ void OSXHIDAction(void* context, IOReturn result, void* sender, IOHIDValueRef va
 }
 
 
+
 - (CVReturn)getFrameForTime:(const CVTimeStamp*)outputTime
 {
 	// NOTE(jeff): We'll probably use this outputTime later for more precise
 	// drawing, but ignore it for now
 	#pragma unused(outputTime)
 
-    @autoreleasepool
-    {
-		[self processFrameAndRunGameLogic:YES];
-    }
+	static bool shouldRenderThisFrame = true;
+
+	if (_renderAtHalfSpeed && !shouldRenderThisFrame)
+	{
+		// skip this frame
+	}
+	else
+	{
+		@autoreleasepool
+		{
+			[self processFrameAndRunGameLogic:YES];
+		}
+	}
+
+	shouldRenderThisFrame = !shouldRenderThisFrame;
 
     return kCVReturnSuccess;
 }
@@ -839,6 +853,8 @@ static void internalLogOpenGLErrors(const char* label)
 	{
 		return;
 	}
+
+	_renderAtHalfSpeed = false;
 
 	NSFileManager* FileManager = [NSFileManager defaultManager];
 	NSString* AppPath = [NSString stringWithFormat:@"%@/Contents/Resources",
@@ -1160,6 +1176,11 @@ static void internalLogOpenGLErrors(const char* label)
 	
 	CVTime cvtime = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(_displayLink);
 	_targetSecondsPerFrame = (double)cvtime.timeValue / (double)cvtime.timeScale;
+
+	if (_renderAtHalfSpeed)
+	{
+		_targetSecondsPerFrame += _targetSecondsPerFrame;
+	}
 
 	printf("targetSecondsPerFrame: %f\n", _targetSecondsPerFrame);
 
