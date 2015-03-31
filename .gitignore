@@ -20,6 +20,10 @@ handmade_sim_region.cpp
 handmade_sim_region.h
 handmade_world.cpp
 handmade_world.h
+handmade_render_group.cpp
+handmade_render_group.h
+handmade_tile.cpp
+handmade_tile.h
 win32_handmade.cpp
 win32_handmade.h
 loop_edit*.hmi
