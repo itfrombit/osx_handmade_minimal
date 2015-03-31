@@ -1084,8 +1084,6 @@ static void internalLogOpenGLErrors(const char* label)
 	_renderBuffer.Height = 540;
 	_renderBuffer.Memory = (uint8*)malloc(_renderBuffer.Width * _renderBuffer.Height * 4);
 	_renderBuffer.Pitch = _renderBuffer.Width * BytesPerPixel;
-	_renderBuffer.BytesPerPixel = BytesPerPixel;
-
 
 	[self setupGamepad];
 
