@@ -1084,8 +1084,6 @@ static void internalLogOpenGLErrors(const char* label)
 	_renderBuffer.Height = 540;
 	_renderBuffer.Memory = (uint8*)malloc(_renderBuffer.Width * _renderBuffer.Height * 4);
 	_renderBuffer.Pitch = _renderBuffer.Width * BytesPerPixel;
-	_renderBuffer.BytesPerPixel = BytesPerPixel;
-
 
 	[self setupGamepad];
 
@@ -1269,10 +1267,10 @@ static void internalLogOpenGLErrors(const char* label)
 		NewController->StickAverageX = _hidX;
 		NewController->StickAverageY = _hidY;
 
-		NewController->ActionDown.EndedDown = _hidButtons[1];
-		NewController->ActionUp.EndedDown = _hidButtons[2];
-		NewController->ActionLeft.EndedDown = _hidButtons[3];
-		NewController->ActionRight.EndedDown = _hidButtons[4];
+		NewController->ActionDown.EndedDown = _currentInput.Controllers[0].ActionDown.EndedDown;
+		NewController->ActionUp.EndedDown = _currentInput.Controllers[0].ActionUp.EndedDown;
+		NewController->ActionLeft.EndedDown = _currentInput.Controllers[0].ActionLeft.EndedDown;
+		NewController->ActionRight.EndedDown = _currentInput.Controllers[0].ActionRight.EndedDown;
 
 		NewController->MoveUp.EndedDown = _currentInput.Controllers[0].MoveUp.EndedDown;
 		NewController->MoveDown.EndedDown = _currentInput.Controllers[0].MoveDown.EndedDown;
