@@ -23,6 +23,8 @@ following files from Casey's source code:
 - handmade_math.h
 - handmade_platform.h
 - handmade_random.h
+- handmade_render_group.cpp
+- handmade_render_group.h
 - handmade_sim_region.cpp
 - handmade_sim_region.h
 - handmade_world.cpp
@@ -38,7 +40,12 @@ either run 'handmade' directly, or 'open Handmade.app'.
 Hot-loading is supported, so you can just run 'make' again while the 
 application is running to build and reload the newest code.
 
-This repository works with Casey's source code from handmade_hero_day_072_source.
+This repository works with Casey's source code from handmade_hero_day_092_source.
+
+For better rendering performance, build the project in Release mode (this is the Makefile default).
+You can also temporarily set the renderAtHalfSpeed flag in HandmadeView.mm to
+reduce the effective rendering rate to 30fps instead of the default
+60fps.
 
 
 Author
