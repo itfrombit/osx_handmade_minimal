@@ -50,7 +50,7 @@ osx_handmade.o: osx_handmade.cpp osx_handmade.h
 	$(CXX) $(COPTS) -c $<
 
 handmade.o: handmade.cpp handmade.h
-	$(CXX) $(COPTS) $(CPP11_FLAGS) -Wno-c++11-compat-deprecated-writable-strings -Wno-tautological-compare -Wno-missing-braces -Wno-unused-variable -Wno-unused-function -c $<
+	$(CXX) $(COPTS) $(CPP11_FLAGS) -Wno-writable-strings -Wno-c++11-compat-deprecated-writable-strings -Wno-tautological-compare -Wno-missing-braces -Wno-unused-variable -Wno-unused-function -c $<
 
 osx_main.o: osx_main.mm osx_handmade.cpp osx_handmade.h handmade.h handmade.cpp HandmadeView.mm HandmadeView.h
 	$(CXX) $(COPTS) -c $<
