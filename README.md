@@ -40,7 +40,7 @@ either run 'handmade' directly, or 'open Handmade.app'.
 Hot-loading is supported, so you can just run 'make' again while the 
 application is running to build and reload the newest code.
 
-This repository works with Casey's source code from handmade_hero_day_092_source.
+This repository works with Casey's source code from handmade_hero_day_111_source.
 
 For better rendering performance, build the project in Release mode (this is the Makefile default).
 You can also temporarily set the renderAtHalfSpeed flag in HandmadeView.mm to
