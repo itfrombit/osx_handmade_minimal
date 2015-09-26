@@ -10,6 +10,12 @@ See the osx_handmade repository for the "standard" OS X version
 that uses an Xcode project.
 
 
+Note 2015-09-26:
+----------------
+I'm currently bringing the Mac port up-to-date after a summer hiatus.
+This version is compatible with Day 121. Threading is up next.
+
+
 IMPORTANT
 ---------
 
@@ -40,12 +46,16 @@ either run 'handmade' directly, or 'open Handmade.app'.
 Hot-loading is supported, so you can just run 'make' again while the 
 application is running to build and reload the newest code.
 
-This repository works with Casey's source code from handmade_hero_day_111_source.
+This repository works with Casey's source code from handmade_hero_day_121.
 
 For better rendering performance, build the project in Release mode (this is the Makefile default).
 You can also temporarily set the renderAtHalfSpeed flag in HandmadeView.mm to
 reduce the effective rendering rate to 30fps instead of the default
 60fps.
+
+I've implemented the necessary calls to output the Debug Cycle Counters.
+To enable this, just replace the three empty stub #defines in handmade_platform.h
+at lines 170-172 with the ones just above inside the _MSC_VER check.
 
 
 Author
