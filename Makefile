@@ -5,7 +5,6 @@ HANDMADE_FLAGS = -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -DHAND
 #HANDMADE_FLAGS = -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DHANDMADE_OSX=1 -DHANDMADE_MIN_OSX -Wno-null-dereference -isysroot /Applications/Xcode-Beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk
 
 COPTS		= -g -Wall $(HANDMADE_FLAGS)
-
 COPTS		= -O3 -Wall $(HANDMADE_FLAGS)
 
 
@@ -34,9 +33,11 @@ handmade: osx_main.o osx_handmade.o HandmadeView.o
 	cp handmade Handmade.app/Contents/MacOS/Handmade
 	cp -R test Handmade.app/Contents/Resources/test
 	cp -R test2 Handmade.app/Contents/Resources/test2
+	cp -R test3 Handmade.app/Contents/Resources/test3
 	mkdir -p Contents/Resources
 	cp -R test ./Contents/Resources/test
 	cp -R test2 ./Contents/Resources/test2
+	cp -R test3 ./Contents/Resources/test3
 	cp libhandmade.dylib Handmade.app/Contents/MacOS/libhandmade.dylib
 
 
@@ -50,7 +51,7 @@ osx_handmade.o: osx_handmade.cpp osx_handmade.h
 	$(CXX) $(COPTS) -c $<
 
 handmade.o: handmade.cpp handmade.h
-	$(CXX) $(COPTS) $(CPP11_FLAGS) -Wno-writable-strings -Wno-c++11-compat-deprecated-writable-strings -Wno-tautological-compare -Wno-missing-braces -Wno-unused-variable -Wno-unused-function -c $<
+	$(CXX) $(COPTS) $(CPP11_FLAGS) -Wno-logical-not-parentheses -Wno-switch -Wno-write-strings -Wno-c++11-compat-deprecated-writable-strings -Wno-tautological-compare -Wno-missing-braces -Wno-unused-variable -Wno-unused-function -c $<
 
 osx_main.o: osx_main.mm osx_handmade.cpp osx_handmade.h handmade.h handmade.cpp HandmadeView.mm HandmadeView.h
 	$(CXX) $(COPTS) -c $<
