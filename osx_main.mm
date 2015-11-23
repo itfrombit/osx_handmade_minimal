@@ -156,8 +156,10 @@ int main(int argc, const char* argv[])
 
 	// Create the main window and the content view
 	NSRect screenRect = [[NSScreen mainScreen] frame];
-	float w = 960.0; // 1920.0;
-	float h = 540.0; // 1080.0;
+	//float w = 960.0; // 1920.0;
+	//float h = 540.0; // 1080.0;
+	float w = 960.0;
+	float h = 540.0;
 	NSRect frame = NSMakeRect((screenRect.size.width - w) * 0.5,
 	                          (screenRect.size.height - h) * 0.5,
 	                          w,
@@ -194,6 +196,8 @@ int main(int argc, const char* argv[])
 	GlobalRunning = true;
 
 	[NSApp run];
+
+	printf("NSApp finished running\n");
 	}
 }
 
