@@ -3,7 +3,7 @@ osx_handmade_minimal
 
 A port of Handmade Hero (http://handmadehero.org) for OS X.
 
-This repository works with Casey's source code from handmade_hero_day_219.
+This repository works with Casey's source code from handmade_hero_day_220.
 
 This version is a demonstration of how to create the app without
 using Xcode or xib files. This is a work in progress.
@@ -12,28 +12,22 @@ See the osx_handmade repository for the "standard" OS X version
 that uses an Xcode project.
 
 
-Note 2015-11-22:
+Note 2015-11-24:
 ----------------
-This version is compatible with Day 219.
+This version is compatible with Day 220.
 
-However, the clang/llvm compiler flags some errors in Casey's
-Handmade Hero source code that need to be fixed before compiling
-under OS X. To fix the source code, run
+However, the Handmade Hero source code is currently using the
+non-portable _snprintf_s function in handmade_debug.cpp.
+To fix the source code, run
 
     sh fix_handmade_hero_source.sh
 
 after copying over Casey's source code, but before running 'make'
 for the first time.
 
-The shell script is not very robust at finding the lines to change,
-so if you are using source code other than Day 219, this may not work.  
-If you would rather fix the errors by hand instead of running the above
-shell script, here's a summary of the compile errors:
-
-1. handmade_platform.h:501:11 - There's extra junk after the #endif. Just delete it.
-2. handmade_generated.h - All of the (u32) casts should be (u64) casts.
-3. handmade_debug.cpp - non-portable _snprintf_s functions are not available on OS X. Insert the contents of the provided file 'vsprintf.cpp' near the top of the file (just after the '#include <stdio.h>' line) to fix.
-4. handmade_debug.cpp:750 - Change the two (u32) casts to (u64) casts in the first line of the GetOrCreateDebugViewFor() function.
+If you would rather fix the error by hand instead of running the above
+shell script, just insert the contents of the provided file 'vsprintf.cpp'
+near the top of the handmade_debug.cpp (just below the '#include <stdio.h>' line).
 
 
 IMPORTANT
