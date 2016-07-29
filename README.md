@@ -1,20 +1,17 @@
-osx_handmade_minimal
-====================
+osx_handmade
+============
 
 A port of Handmade Hero (http://handmadehero.org) for OS X.
 
-This repository works with Casey's source code from handmade_hero_day_220.
-
-This version is a demonstration of how to create the app without
-using Xcode or xib files. This is a work in progress.
-
-See the osx_handmade repository for the "standard" OS X version
-that uses an Xcode project.
+This repository works with Casey's source code from handmade_hero_day_234.
 
 
-Note 2015-11-24:
+Note 2016-07-11:
 ----------------
-This version is compatible with Day 220.
+I am currently in the process of bringing the OS X platform layer up-to-date
+after another winter/spring hiatus.
+
+This version is compatible with Day 234.
 
 However, the Handmade Hero source code is currently using the
 non-portable _snprintf_s function in handmade_debug.cpp.
@@ -30,14 +27,39 @@ shell script, just insert the contents of the provided file 'vsprintf.cpp'
 near the top of the handmade_debug.cpp (just below the '#include <stdio.h>' line).
 
 
-IMPORTANT
----------
+Some things have changed from the previous commit. The directory
+structure has been cleaned up and is now more compatible with
+the Handmade Hero Github repository.
 
-Once you clone or update this repository, copy over Casey's .cpp
-and .h source files to the root directory of this repository.
+The architecture of the platform layer has also changed. CVDisplayLink
+is no longer used. Instead, OpenGL vsync is used to update the frame.
+Also, a new manual run loop was implemented to be more compatible with
+the Windows platform layer.
 
-Also, copy over the test, test2, and test3 asset folders to the
-root directory of this repository.
+The platform layer no longer creates an explicit NSOpenGLView-derived object.
+This object was just extra boilerplate code. We now just create an OpenGLContext
+and assign it to the application's default contentView.
+
+Finally, I combined the two OS X Handmade Hero projects that I had been
+maintaining. I originally created two projects to show how to write an OS X
+program with and without Xcode. However, most of the code between the
+two projects was identical and there was no real reason to continue
+as two separate projects. This combined repository allows you to develop
+either way. If you wwant to use Xcode, open the Handmade Hero Xcode
+project in the xcode subdirectory and build it as before. If you do not
+want to use Xcode, run 'make' from the code subdirectory and it should
+also work as before.
+
+
+Compiling and Running
+---------------------
+
+Once you clone or update this repository, copy (or clone, if you are
+using Casey's Github repository) Casey's .cpp
+and .h source files to the cpp/code subdirectory of this repository.
+
+Also, copy over the test, test2, and test3 asset folders, and the 
+intro_art.hha file to the data subdirectory of this repository.
 
 Before you build the application for the first time, you need to
 create the packed asset files. To do this, run
@@ -45,8 +67,11 @@ create the packed asset files. To do this, run
     make osx_asset_builder
 
 and then execute the osx_asset_builder command line program. This will
-create the .hha files. From then on, you can just run 'make' 
-to build the application bundle.
+create the .hha files. From then on, you can just run 'make' from the code
+directory (Note: not the cpp/code directory!) to build the application bundle.
+
+If you already have packed asset files, you can just copy them to the data
+subdirectory and skip building and running the osx_asset_builder.
 
 You can then either run 'handmade' directly, or 'open Handmade.app'.
 The advantage of running 'handmade' directly is that debug console output 
