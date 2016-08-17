@@ -52,6 +52,7 @@ stb_truetype.h
 win32_handmade.cpp
 win32_handmade.h
 loop_edit*.hmi
+build/
 Contents/
 test/
 test2/
